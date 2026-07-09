@@ -13,9 +13,8 @@
 
 import { generateMap } from './mapgen.js';
 import { findPath }   from './pathfinding.js';
-
-// Browser-only imports are loaded dynamically inside the DOM guard at the bottom.
-// This allows the pure functions above to be imported in Node.js for unit testing.
+import { render }     from './renderer.js';
+import { showScreen, bindControls, getSelectedDifficulty } from './ui.js';
 
 // ---------------------------------------------------------------------------
 // Exported constants
@@ -184,11 +183,7 @@ export function checkEndConditions(state) {
 // ---------------------------------------------------------------------------
 
 if (typeof document !== 'undefined') {
-  // Dynamic import of browser-only modules keeps pure logic testable in Node
-  Promise.all([
-    import('./renderer.js'),
-    import('./ui.js'),
-  ]).then(([{ render }, { showScreen, bindControls, getSelectedDifficulty }]) => {
+  {
     const canvas = document.getElementById('game-canvas');
     let state = null;
     let isProcessing = false;
@@ -240,5 +235,5 @@ if (typeof document !== 'undefined') {
       onRestart: handleRestart,
       onKeyDown: handleKeyDown,
     });
-  });
+  }
 }
