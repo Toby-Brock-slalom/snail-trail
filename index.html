@@ -229,6 +229,16 @@
 
     .btn:active { transform: scale(0.97); }
 
+    .btn-secondary {
+      background: transparent;
+      color: var(--color-text);
+      border: 2px solid #3f3f5c;
+    }
+    .btn-secondary:hover, .btn-secondary:focus-visible {
+      background: #3f3f5c;
+      filter: none;
+    }
+
     .btn:disabled {
       opacity: 0.4;
       cursor: not-allowed;
@@ -475,6 +485,8 @@
           <label class="overlay-diff-option"><input type="radio" name="lose-difficulty" value="infinite" /> Infinite</label>
         </fieldset>
         <button id="btn-restart-lose" class="btn">Try Again</button>
+        <button id="btn-mainmenu-lose" class="btn btn-secondary">Main Menu</button>
+        <button id="btn-mainmenu-lose" class="btn btn-secondary">Main Menu</button>
       </div>
 
     </div><!-- /.game-wrapper -->
@@ -945,6 +957,11 @@
     document.getElementById('btn-start').addEventListener('click', function(){ handlers.onStart(); });
     document.getElementById('btn-restart-win').addEventListener('click',  function(){ handlers.onRestart(); });
     document.getElementById('btn-restart-lose').addEventListener('click', function(){ handlers.onRestart(); });
+    document.getElementById('btn-mainmenu-lose').addEventListener('click', function(){
+      stopHudInterval(0);
+      state = null;
+      showScreen('start');
+    });
 
     document.getElementById('btn-leaderboard').addEventListener('click', function(){
       showLeaderboard(loadLeaderboard());
