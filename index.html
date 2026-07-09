@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Snail Trail</title>
+  <style>
+    /* Design tokens */
+    :root {
+      --color-wall: #2a2a2a;
+      --color-open: #d4d4d4;
+      --color-treasure: #f0b429;
+      --color-player: #3b82f6;
+      --color-snail: #f97316;
+      --color-snail-shell: #7c2d12;
+      --color-overlay-bg: rgba(0, 0, 0, 0.72);
+      --color-surface: #1e1e2e;
+      --color-text: #f5f5f5;
+      --color-accent: #f0b429;
+      --radius: 8px;
+      --gap: 1rem;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--color-surface);
+      color: var(--color-text);
+      font-family: system-ui, sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--gap);
+      padding: 1rem;
+    }
+
+    h1.game-title {
+      font-size: clamp(1.5rem, 4vw, 2.5rem);
+      letter-spacing: 0.05em;
+      color: var(--color-accent);
+      text-align: center;
+    }
+
+    /* Canvas */
+    #game-canvas {
+      display: block;
+      border: 3px solid #3f3f5c;
+      border-radius: var(--radius);
+      image-rendering: pixelated;
+    }
+
+    /* Overlay & screen positioning */
+    .game-wrapper {
+      position: relative;
+      display: inline-block;
+      line-height: 0;
+    }
+
+    /* Screen / overlay shared styles */
+    .screen,
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      border-radius: var(--radius);
+      padding: 2rem;
+      text-align: center;
+    }
+
+    /* Start screen sits on top of an empty canvas */
+    #screen-start {
+      background: var(--color-surface);
+      color: var(--color-text);
+      position: static;
+      border: 3px solid #3f3f5c;
+      border-radius: var(--radius);
+      padding: 2.5rem 3rem;
+      min-width: 300px;
+    }
+
+    #screen-start h2 {
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+      color: var(--color-accent);
+    }
+
+    #screen-start p {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin-bottom: 1.25rem;
+    }
+
+    /* Overlays */
+    .overlay {
+      background: var(--color-overlay-bg);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+    }
+
+    .overlay h2 {
+      font-size: clamp(1.4rem, 3vw, 2rem);
+    }
+
+    .overlay p {
+      font-size: 1rem;
+      color: #ccc;
+    }
+
+    #overlay-win h2 { color: #4ade80; }
+    #overlay-lose h2 { color: #f87171; }
+
+    /* Fieldset for difficulty */
+    fieldset.difficulty-group {
+      border: 1px solid #3f3f5c;
+      border-radius: var(--radius);
+      padding: 0.75rem 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+
+    fieldset.difficulty-group legend {
+      font-size: 0.8rem;
+      color: #aaa;
+      padding: 0 0.4rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .difficulty-option {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.3rem 0;
+      cursor: pointer;
+    }
+
+    .difficulty-option input[type="radio"] {
+      accent-color: var(--color-accent);
+      width: 1rem;
+      height: 1rem;
+    }
+
+    .difficulty-option label {
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    /* Buttons */
+    .btn {
+      background: var(--color-accent);
+      color: #1a1a1a;
+      border: none;
+      border-radius: var(--radius);
+      padding: 0.65rem 2rem;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: filter 0.15s ease, transform 0.1s ease;
+      min-width: 140px;
+    }
+
+    .btn:hover,
+    .btn:focus-visible {
+      filter: brightness(1.15);
+      outline: 3px solid #fff6;
+      outline-offset: 2px;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    /* Hidden utility */
+    .hidden {
+      display: none !important;
+    }
+
+    /* Visually hidden but accessible */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* Reduced motion */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        transition: none !important;
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1 class="game-title">🐌 Snail Trail</h1>
+
+  <!-- Start Screen (visible before game begins) -->
+  <div id="screen-start">
+    <h2>Choose Difficulty</h2>
+    <p>Navigate the maze — reach the treasure before the snails catch you!</p>
+
+    <fieldset class="difficulty-group">
+      <legend>Difficulty</legend>
+
+      <div class="difficulty-option">
+        <input type="radio" name="difficulty" id="diff-easy" value="easy" checked />
+        <label for="diff-easy">Easy — 15×15, 1 Snail</label>
+      </div>
+
+      <div class="difficulty-option">
+        <input type="radio" name="difficulty" id="diff-medium" value="medium" />
+        <label for="diff-medium">Medium — 20×20, 2 Snails</label>
+      </div>
+
+      <div class="difficulty-option">
+        <input type="radio" name="difficulty" id="diff-hard" value="hard" />
+        <label for="diff-hard">Hard — 25×25, 3 Snails</label>
+      </div>
+    </fieldset>
+
+    <button id="btn-start" class="btn">Play</button>
+    <p style="font-size:0.75rem;color:#666;margin-top:0.5rem;">Arrow keys or WASD to move</p>
+  </div>
+
+  <!-- Game canvas wrapper (hidden until play begins) -->
+  <div class="game-wrapper hidden" id="game-area">
+    <canvas
+      id="game-canvas"
+      aria-label="Snail Trail game canvas"
+      role="img"
+    ></canvas>
+
+    <!-- Win Overlay -->
+    <div id="overlay-win" class="overlay hidden">
+      <h2>You Found the Treasure! 🏆</h2>
+      <p>You navigated the maze and reached the treasure chest!</p>
+      <button id="btn-restart-win" class="btn">New Game</button>
+    </div>
+
+    <!-- Lose Overlay -->
+    <div id="overlay-lose" class="overlay hidden">
+      <h2>Caught by a Snail! 🐌</h2>
+      <p>A snail caught up with you. Better luck next time!</p>
+      <button id="btn-restart-lose" class="btn">Try Again</button>
+    </div>
+  </div>
+
+  <!-- ARIA live region for screen reader announcements -->
+  <div id="game-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- ES module entry point -->
+  <script type="module" src="./src/game.js"></script>
+</body>
+</html>
