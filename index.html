@@ -265,7 +265,248 @@
   <!-- ARIA live region for screen reader announcements -->
   <div id="game-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
-  <!-- ES module entry point -->
-  <script type="module" src="./src/game.js"></script>
+  <script>
+  // ── Constants ────────────────────────────────────────────────────────────
+  const CELL = Object.freeze({ WALL: 'wall', OPEN: 'open', START: 'start', TREASURE: 'treasure' });
+  const PHASE = Object.freeze({ START: 'start', PLAYING: 'playing', WIN: 'win', LOSE: 'lose' });
+  const DIRECTION_DELTA = Object.freeze({ up:{dcol:0,drow:-1}, down:{dcol:0,drow:1}, left:{dcol:-1,drow:0}, right:{dcol:1,drow:0} });
+
+  // ── Map generation ────────────────────────────────────────────────────────
+  function makeGrid(cols, rows, defaultType) {
+    const cells = [];
+    for (let row = 0; row < rows; row++) {
+      const rowArr = [];
+      for (let col = 0; col < cols; col++) rowArr.push({ col, row, type: defaultType });
+      cells.push(rowArr);
+    }
+    return { cols, rows, cells };
+  }
+  function shuffle(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+  }
+  function getNeighboursTwoAway(grid, col, row) {
+    return [{col,row:row-2},{col,row:row+2},{col:col-2,row},{col:col+2,row}]
+      .filter(n => n.row>=0 && n.row<grid.rows && n.col>=0 && n.col<grid.cols && grid.cells[n.row][n.col].type===CELL.WALL);
+  }
+  function carveWall(grid, fromCol, fromRow, toCol, toRow) {
+    grid.cells[(fromRow+toRow)/2][(fromCol+toCol)/2].type = CELL.OPEN;
+    grid.cells[toRow][toCol].type = CELL.OPEN;
+  }
+  function findOpenCellInQuadrant(grid, [colMin,colMax], [rowMin,rowMax]) {
+    for (let row=rowMin; row<rowMax; row++)
+      for (let col=colMin; col<colMax; col++)
+        if (grid.cells[row][col].type===CELL.OPEN || grid.cells[row][col].type===CELL.START) return grid.cells[row][col];
+    return null;
+  }
+  function findLastOpenCellInQuadrant(grid, [colMin,colMax], [rowMin,rowMax]) {
+    let found = null;
+    for (let row=rowMin; row<rowMax; row++)
+      for (let col=colMin; col<colMax; col++)
+        if (grid.cells[row][col].type===CELL.OPEN) found = grid.cells[row][col];
+    return found;
+  }
+  function removeRandomWalls(grid, count) {
+    const candidates = [];
+    for (let row=1; row<grid.rows-1; row++)
+      for (let col=1; col<grid.cols-1; col++) {
+        if (grid.cells[row][col].type!==CELL.WALL) continue;
+        const open = [{row:row-1,col},{row:row+1,col},{row,col:col-1},{row,col:col+1}]
+          .filter(n=>n.row>=0&&n.row<grid.rows&&n.col>=0&&n.col<grid.cols&&grid.cells[n.row][n.col].type===CELL.OPEN);
+        if (open.length >= 2) candidates.push({col,row});
+      }
+    shuffle(candidates);
+    for (let i=0; i<Math.min(count,candidates.length); i++) grid.cells[candidates[i].row][candidates[i].col].type=CELL.OPEN;
+  }
+  function generateMap(cols, rows, snailCount) {
+    const grid = makeGrid(cols, rows, CELL.WALL);
+    grid.cells[1][1].type = CELL.OPEN;
+    const stack = [{col:1,row:1}];
+    while (stack.length) {
+      const cur = stack[stack.length-1];
+      const unvisited = getNeighboursTwoAway(grid, cur.col, cur.row);
+      if (!unvisited.length) { stack.pop(); continue; }
+      shuffle(unvisited);
+      carveWall(grid, cur.col, cur.row, unvisited[0].col, unvisited[0].row);
+      stack.push(unvisited[0]);
+    }
+    removeRandomWalls(grid, Math.floor(cols*rows*0.04));
+    const startCell = findOpenCellInQuadrant(grid, [1,Math.ceil(cols/2)], [1,Math.ceil(rows/2)]);
+    if (startCell) startCell.type = CELL.START;
+    const treasureCell = findLastOpenCellInQuadrant(grid, [Math.floor(cols/2),cols-1], [Math.floor(rows/2),rows-1]);
+    if (treasureCell) treasureCell.type = CELL.TREASURE;
+    const openCells = [];
+    for (let row=0; row<rows; row++)
+      for (let col=0; col<cols; col++)
+        if (grid.cells[row][col].type===CELL.OPEN) openCells.push(grid.cells[row][col]);
+    shuffle(openCells);
+    return { grid, startCell, treasureCell, snailStartCells: openCells.slice(0, snailCount) };
+  }
+
+  // ── Pathfinding (A*) ──────────────────────────────────────────────────────
+  function heuristic(a, b) { return Math.abs(a.col-b.col)+Math.abs(a.row-b.row); }
+  function posKey(col, row) { return `${col},${row}`; }
+  function getPassableNeighbours(grid, col, row) {
+    return [{col,row:row-1},{col,row:row+1},{col:col-1,row},{col:col+1,row}]
+      .filter(n=>n.row>=0&&n.row<grid.rows&&n.col>=0&&n.col<grid.cols&&grid.cells[n.row][n.col].type!==CELL.WALL);
+  }
+  function reconstructPath(cameFrom, current) {
+    const path = [{col:current.col,row:current.row}];
+    let node = current;
+    while (cameFrom.has(posKey(node.col,node.row))) { node=cameFrom.get(posKey(node.col,node.row)); path.unshift({col:node.col,row:node.row}); }
+    return path;
+  }
+  function findPath(grid, from, to) {
+    if (grid.cells[from.row]?.[from.col]?.type===CELL.WALL) return null;
+    if (grid.cells[to.row]?.[to.col]?.type===CELL.WALL) return null;
+    if (from.col===to.col && from.row===to.row) return [{col:from.col,row:from.row}];
+    const openSet=[], closedSet=new Set(), cameFrom=new Map(), gScore=new Map(), fScore=new Map();
+    const sk=posKey(from.col,from.row);
+    gScore.set(sk,0); fScore.set(sk,heuristic(from,to));
+    openSet.push({col:from.col,row:from.row,f:fScore.get(sk)});
+    while (openSet.length) {
+      const cur=openSet.shift(), ck=posKey(cur.col,cur.row);
+      if (cur.col===to.col&&cur.row===to.row) return reconstructPath(cameFrom,cur);
+      if (closedSet.has(ck)) continue;
+      closedSet.add(ck);
+      for (const nb of getPassableNeighbours(grid,cur.col,cur.row)) {
+        const nk=posKey(nb.col,nb.row);
+        if (closedSet.has(nk)) continue;
+        const tg=(gScore.get(ck)??Infinity)+1;
+        if (tg<(gScore.get(nk)??Infinity)) {
+          cameFrom.set(nk,{col:cur.col,row:cur.row});
+          gScore.set(nk,tg);
+          const f=tg+heuristic(nb,to); fScore.set(nk,f);
+          const entry={col:nb.col,row:nb.row,f};
+          let ins=false;
+          for (let i=0;i<openSet.length;i++) { if (f<openSet[i].f){openSet.splice(i,0,entry);ins=true;break;} }
+          if (!ins) openSet.push(entry);
+        }
+      }
+    }
+    return null;
+  }
+
+  // ── Renderer ──────────────────────────────────────────────────────────────
+  const CELL_SIZE = 32;
+  const COLOR = Object.freeze({
+    WALL:'#2a2a2a', OPEN:'#d4d4d4', START:'#c8c8c8',
+    TREASURE_BG:'#f0b429', TREASURE_FG:'#b8860b',
+    PLAYER:'#3b82f6', SNAIL:'#f97316', SNAIL_SHELL:'#7c2d12',
+  });
+  function drawCell(ctx, cell, cw, ch) {
+    const x=cell.col*cw, y=cell.row*ch;
+    if (cell.type==='wall') { ctx.fillStyle=COLOR.WALL; ctx.fillRect(x,y,cw,ch); return; }
+    ctx.fillStyle=COLOR.OPEN; ctx.fillRect(x,y,cw,ch);
+    if (cell.type==='treasure') {
+      const m=cw*0.1, w=cw*0.8, h=ch*0.55, cx2=x+m, cy2=y+(ch-h)/2;
+      ctx.fillStyle=COLOR.TREASURE_BG; ctx.fillRect(cx2,cy2,w,h);
+      ctx.fillStyle=COLOR.TREASURE_FG; ctx.fillRect(cx2,cy2+h*0.4,w,2);
+      const ls=cw*0.14; ctx.fillRect(cx2+w/2-ls/2,cy2+h*0.35,ls,ls*0.9);
+    }
+  }
+  function drawPlayer(ctx, player, cw, ch) {
+    const cx=player.col*cw+cw/2, cy=player.row*ch+ch/2, r=cw*0.38;
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fillStyle=COLOR.PLAYER; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx-r*0.3,cy-r*0.25,r*0.18,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx+r*0.3,cy-r*0.25,r*0.18,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
+  }
+  function drawSnail(ctx, snail, cw, ch) {
+    const cx=snail.col*cw+cw/2, cy=snail.row*ch+ch/2, br=cw*0.35, sr=cw*0.20;
+    ctx.beginPath(); ctx.arc(cx,cy,br,0,Math.PI*2); ctx.fillStyle=COLOR.SNAIL; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx+br*0.15,cy-br*0.1,sr,-Math.PI/2,Math.PI,false);
+    ctx.strokeStyle=COLOR.SNAIL_SHELL; ctx.lineWidth=Math.max(1.5,cw*0.05); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx+br*0.15,cy-br*0.1,sr*0.3,0,Math.PI*2); ctx.fillStyle=COLOR.SNAIL_SHELL; ctx.fill();
+  }
+  function render(canvas, state) {
+    const {grid,player,snails}=state;
+    canvas.width=grid.cols*CELL_SIZE; canvas.height=grid.rows*CELL_SIZE;
+    const ctx=canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    for (let row=0;row<grid.rows;row++) for (let col=0;col<grid.cols;col++) drawCell(ctx,grid.cells[row][col],CELL_SIZE,CELL_SIZE);
+    for (const snail of snails) drawSnail(ctx,snail,CELL_SIZE,CELL_SIZE);
+    drawPlayer(ctx,player,CELL_SIZE,CELL_SIZE);
+  }
+
+  // ── UI ────────────────────────────────────────────────────────────────────
+  let bound = false;
+  function showScreen(screenId) {
+    const ss=document.getElementById('screen-start'), ow=document.getElementById('overlay-win'),
+          ol=document.getElementById('overlay-lose'), ga=document.getElementById('game-area'),
+          st=document.getElementById('game-status');
+    ss.classList.add('hidden'); ow.classList.add('hidden'); ol.classList.add('hidden');
+    if (screenId==='start') { ga.classList.add('hidden'); ss.classList.remove('hidden'); if(st)st.textContent='Choose difficulty and press Play.'; }
+    else if (screenId==='game') { ga.classList.remove('hidden'); if(st)st.textContent='Game started. Use arrow keys or WASD to move.'; }
+    else if (screenId==='win') { ga.classList.remove('hidden'); ow.classList.remove('hidden'); if(st)st.textContent='You won!'; }
+    else if (screenId==='lose') { ga.classList.remove('hidden'); ol.classList.remove('hidden'); if(st)st.textContent='A snail caught you!'; }
+  }
+  function getSelectedDifficulty() {
+    const checked=document.querySelector('input[name="difficulty"]:checked');
+    const configs={easy:{name:'Easy',cols:15,rows:15,snailCount:1},medium:{name:'Medium',cols:20,rows:20,snailCount:2},hard:{name:'Hard',cols:25,rows:25,snailCount:3}};
+    return configs[checked?checked.value:'easy']??configs.easy;
+  }
+  function bindControls(handlers) {
+    if (bound) return; bound=true;
+    document.getElementById('btn-start').addEventListener('click',()=>handlers.onStart());
+    document.getElementById('btn-restart-win').addEventListener('click',()=>handlers.onRestart());
+    document.getElementById('btn-restart-lose').addEventListener('click',()=>handlers.onRestart());
+    const KEY_MAP={ArrowUp:'up',w:'up',W:'up',ArrowDown:'down',s:'down',S:'down',ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right'};
+    document.addEventListener('keydown',(e)=>{ const dir=KEY_MAP[e.key]; if(!dir)return; e.preventDefault(); handlers.onKeyDown(dir); });
+  }
+
+  // ── Game logic ────────────────────────────────────────────────────────────
+  function createGameState(difficulty) {
+    const {grid,startCell,treasureCell,snailStartCells}=generateMap(difficulty.cols,difficulty.rows,difficulty.snailCount);
+    return {
+      phase:PHASE.PLAYING, difficulty, grid,
+      player:{col:startCell.col,row:startCell.row,stepCount:0},
+      snails:snailStartCells.map((c,i)=>({id:i,col:c.col,row:c.row})),
+      treasureCell:{col:treasureCell.col,row:treasureCell.row},
+    };
+  }
+  function movePlayer(state, direction) {
+    const {dcol,drow}=DIRECTION_DELTA[direction];
+    const tc=state.player.col+dcol, tr=state.player.row+drow;
+    if (tr<0||tr>=state.grid.rows||tc<0||tc>=state.grid.cols) return state;
+    if (state.grid.cells[tr][tc].type===CELL.WALL) return state;
+    return {...state,player:{col:tc,row:tr,stepCount:state.player.stepCount+1}};
+  }
+  function resolveSnailTurns(state) {
+    return {...state,snails:state.snails.map(snail=>{
+      const path=findPath(state.grid,{col:snail.col,row:snail.row},{col:state.player.col,row:state.player.row});
+      return (path&&path.length>=2)?{...snail,col:path[1].col,row:path[1].row}:snail;
+    })};
+  }
+  function checkEndConditions(state) {
+    if (state.phase!==PHASE.PLAYING) return state;
+    if (state.player.col===state.treasureCell.col&&state.player.row===state.treasureCell.row) return {...state,phase:PHASE.WIN};
+    if (state.snails.some(s=>s.col===state.player.col&&s.row===state.player.row)) return {...state,phase:PHASE.LOSE};
+    return state;
+  }
+
+  // ── Wiring ────────────────────────────────────────────────────────────────
+  const canvas = document.getElementById('game-canvas');
+  let state = null, isProcessing = false;
+  function handleStart() {
+    state=createGameState(getSelectedDifficulty()); isProcessing=false;
+    showScreen('game'); requestAnimationFrame(()=>render(canvas,state));
+  }
+  function handleRestart() { isProcessing=false; handleStart(); }
+  function handleKeyDown(direction) {
+    if (!state||state.phase!==PHASE.PLAYING||isProcessing) return;
+    isProcessing=true;
+    state=movePlayer(state,direction);
+    if (state.player.stepCount%2===0&&state.player.stepCount>0) state=resolveSnailTurns(state);
+    state=checkEndConditions(state);
+    if (state.phase===PHASE.WIN) showScreen('win');
+    else if (state.phase===PHASE.LOSE) showScreen('lose');
+    requestAnimationFrame(()=>{ render(canvas,state); isProcessing=false; });
+  }
+  showScreen('start');
+  bindControls({onStart:handleStart,onRestart:handleRestart,onKeyDown:handleKeyDown});
+  </script>
 </body>
 </html>
