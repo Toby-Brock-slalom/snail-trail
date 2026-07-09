@@ -183,6 +183,143 @@
 
 ---
 
+---
+
+## Phase 9: User Story 6 — Level Timer (Priority: P3)
+
+**Goal**: A visible HUD timer starts when gameplay begins, ticks during play, freezes on win or loss, and the win overlay shows the final elapsed time.
+
+**Independent Test**: Start a game, wait ~5 seconds, win, verify the win overlay shows a time value approximately matching the wait. Restart — timer resets to zero and counts again.
+
+### Tests for User Story 6
+
+- [X] T062 [P] [US6] Write test in `test/game.test.js`: `createGameState` returns state with `startTime` as a positive number (greater than 0) and `finalElapsedMs` equal to `null`
+- [X] T063 [P] [US6] Write test in `test/game.test.js`: `checkEndConditions` when player is on the treasure cell returns state with `phase === PHASE.WIN` and `finalElapsedMs` as a non-null positive number
+- [X] T064 [P] [US6] Write test in `test/game.test.js`: `checkEndConditions` when a snail shares the player's cell returns state with `phase === PHASE.LOSE` and `finalElapsedMs` as a non-null positive number
+
+### Implementation for User Story 6
+
+- [X] T065 [US6] Add `startTime` and `finalElapsedMs` fields to `GameState` in `src/game.js`: `createGameState` sets `startTime: performance.now()` and `finalElapsedMs: null`; add exported constants `HUD_INTERVAL_MS = 100` at the top of the file alongside the existing constants
+- [X] T066 [US6] Extend `checkEndConditions` in `src/game.js`: when transitioning to `PHASE.WIN` or `PHASE.LOSE`, include `finalElapsedMs: performance.now() - state.startTime` in the returned state object; mirror this change in the inline script in `index.html`
+- [X] T067 [US6] Add `<div id="hud" class="hidden">` immediately above `<canvas id="game-canvas">` in `index.html` with two child spans: `<span id="hud-timer">0.00s</span>` (left side) and `<span id="hud-mode">Easy</span>` (right side); add CSS to `<style>`: `#hud { display: flex; justify-content: space-between; padding: 4px 8px; font-family: monospace; font-size: 1rem; background: var(--color-hud-bg, #111); color: var(--color-hud-text, #eee); }` and add `--color-hud-bg` / `--color-hud-text` to the `:root` block
+- [X] T068 [US6] Implement `showHud()`, `hideHud()`, `updateHudTimer(elapsedMs)`, and `updateHudMode(label)` in the inline script in `index.html`: `showHud()` removes `hidden` from `#hud`; `hideHud()` adds it; `updateHudTimer(ms)` sets `document.getElementById('hud-timer').textContent = (ms / 1000).toFixed(2) + 's'`; `updateHudMode(label)` sets `document.getElementById('hud-mode').textContent = label`; mirror stubs in `src/ui.js` for constitution consistency
+- [X] T069 [US6] Wire the HUD interval in the inline script in `index.html`: declare `let hudInterval = null` at module scope; on game start call `showHud()`, `updateHudMode(modeName)`, then `hudInterval = setInterval(() => updateHudTimer(performance.now() - state.startTime), HUD_INTERVAL_MS)`; in the win/lose handler call `clearInterval(hudInterval); hudInterval = null` then call `updateHudTimer(state.finalElapsedMs)`; on restart clear any existing interval before starting a new one to prevent stacking
+- [X] T070 [US6] Display the final elapsed time on the win overlay: add `<p id="win-time" class="hidden"></p>` inside `#overlay-win` in `index.html`; in the win handler of the inline script set `document.getElementById('win-time').textContent = 'Time: ' + (state.finalElapsedMs / 1000).toFixed(2) + 's'` and remove `hidden`; on restart re-add `hidden` to `#win-time` before showing the new game
+
+**Checkpoint**: Start a game → HUD shows `0.00s` ticking up and the mode label. Win → timer freezes, win overlay shows `Time: X.XXs`. Restart → timer resets to `0.00s`.
+
+---
+
+## Phase 10: User Story 8 — Infinite Mode (Priority: P2)
+
+**Goal**: Infinite Mode escalates grid size and snail count on each win. A level counter is visible during play. On loss the highest level reached is displayed.
+
+**Independent Test**: Select Infinite Mode, win Level 1 (20×20, 2 snails) → Level 2 begins with 25×25, 3 snails, HUD shows "Infinite — Level 2". Lose → lose overlay shows "Reached Level 2".
+
+### Tests for User Story 8
+
+- [X] T071 [P] [US8] Write test in `test/game.test.js`: `createGameState` with a config of `{ mode: 'infinite', infiniteLevel: 0 }` produces a state with `grid.cols === 20`, `grid.rows === 20`, `snails.length === 2`, and `infiniteLevel === 0`
+- [X] T072 [P] [US8] Write test in `test/game.test.js`: calling `createGameState` with `infiniteLevel = 1` produces `grid.cols === 25`, `grid.rows === 25`, and `snails.length === 3` (validates formulas `20 + level * 5` and `2 + level`)
+- [X] T073 [P] [US8] Write benchmark test in `test/mapgen.test.js`: `generateMap(120, 120, 22)` (simulating Infinite Level 20: `20 + 20*5 = 120` cols/rows, `2 + 20 = 22` snails) completes in < 100 ms (use `benchmark` helper from T010)
+
+### Implementation for User Story 8
+
+- [X] T074 [US8] Add `DIFFICULTY.INFINITE = { mode: 'infinite' }` to the frozen `DIFFICULTY` constant in `src/game.js`; add exported constants `INFINITE_BASE_SIZE = 20`, `INFINITE_SIZE_STEP = 5`, `INFINITE_BASE_SNAILS = 2`; extend `createGameState` to accept an `{ mode, infiniteLevel }` config object — when `mode === 'infinite'`, compute `cols = rows = INFINITE_BASE_SIZE + infiniteLevel * INFINITE_SIZE_STEP` and `snailCount = INFINITE_BASE_SNAILS + infiniteLevel`; store `mode` and `infiniteLevel` on the returned state; mirror all changes in the inline script in `index.html`
+- [X] T075 [US8] Add `<input type="radio" name="difficulty" value="infinite">` with `<label>` text "Infinite — Escalating" to the `<fieldset>` in `#screen-start` in `index.html`; update `getSelectedDifficulty()` in the inline script (and `src/ui.js`) to map `'infinite'` → `DIFFICULTY.INFINITE`; add a `currentInfiniteLevel` module-level variable (initialised to `0`) in the inline script, reset to `0` on any fresh game start
+- [X] T076 [US8] Extend the win handler in the inline script in `index.html` for Infinite Mode: `if (state.mode === 'infinite')` increment `currentInfiniteLevel`, call `createGameState({ mode: 'infinite', infiniteLevel: currentInfiniteLevel })`, call `showScreen('game')`, reset `isProcessing`, call `updateHudMode('Infinite — Level ' + (currentInfiniteLevel + 1))`, restart the HUD interval, and schedule `requestAnimationFrame(() => render(canvas, state))`; do NOT show the win overlay in this branch
+- [X] T077 [US8] Extend the lose handler in the inline script in `index.html` for Infinite Mode: when `state.mode === 'infinite'`, set the text of `<p id="lose-infinite-level"></p>` (add this element inside `#overlay-lose` in `index.html`) to `'Reached Level ' + (state.infiniteLevel + 1)` and remove `hidden` from it; for all other modes add `hidden` back to `#lose-infinite-level` before showing the lose overlay; reset `currentInfiniteLevel = 0` after displaying the lose overlay
+
+**Checkpoint**: Select Infinite, start game → HUD shows "Infinite — Level 1" on a 20×20 grid with 2 snails. Win → HUD changes to "Infinite — Level 2", new 25×25 grid with 3 snails, no win overlay shown. Lose → lose overlay shows "Reached Level 2".
+
+---
+
+## Phase 11: User Story 7 — In-Overlay Difficulty Change (Priority: P4)
+
+**Goal**: Win and lose overlays both include a compact difficulty selector so the player can change mode between games without returning to the start screen.
+
+**Independent Test**: Win on Easy → win overlay contains a radio group with Easy/Medium/Hard/Infinite. Change to Hard, click New Game → new game starts on Hard (25×25, 3 snails).
+
+### Implementation for User Story 7
+
+- [X] T078 [US7] Add an overlay difficulty selector to both `#overlay-win` and `#overlay-lose` in `index.html`: inside each overlay, add `<fieldset class="overlay-difficulty-selector"><legend>Next game mode</legend>` containing four `<input type="radio" name="overlay-difficulty" value="easy|medium|hard|infinite">` inputs each with a `<label>` (e.g. "Easy", "Medium", "Hard", "Infinite"); close `</fieldset>`; add CSS for `.overlay-difficulty-selector` to render as a compact inline row (e.g. `display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.75rem`) with label text small enough to fit; both fieldsets share `name="overlay-difficulty"` so they act as two independent groups
+- [X] T079 [US7] Implement `getOverlaySelectedDifficulty()` in the inline script in `index.html`: query `document.querySelector('input[name="overlay-difficulty"]:checked')?.value ?? 'easy'` and map to the same `DIFFICULTY.*` objects as `getSelectedDifficulty()`; implement `setOverlayDifficulty(mode)` that programmatically checks the radio matching `mode` value in both overlay selectors (query all `input[name="overlay-difficulty"][value="${mode}"]` and set `.checked = true`)
+- [X] T080 [US7] Update the win and lose handler in the inline script in `index.html`: when showing a win or lose overlay (non-infinite win, standard lose) call `setOverlayDifficulty(state.mode)` to pre-select the just-played mode; update `onRestart` (for the overlay buttons) to call `getOverlaySelectedDifficulty()` to determine the next game's mode, reset `currentInfiniteLevel = 0`, and pass the result to `createGameState`; the start screen's `onStart` handler continues to use `getSelectedDifficulty()` unchanged
+
+**Checkpoint**: Win on Medium → overlay difficulty selector shows Medium pre-selected. Change to Infinite, click New Game → Infinite game starts at Level 1.
+
+---
+
+## Phase 12: User Story 9 — Leaderboard (Priority: P5)
+
+**Goal**: Per-category top-5 entries persist in `localStorage`. A Leaderboard button on the start screen shows all categories with correct sorting.
+
+**Independent Test**: Set a record on Easy, reload the page, open the leaderboard — the record appears with the correct name, time, and date.
+
+### Tests for User Story 9
+
+- [X] T081 [P] [US9] Create `test/leaderboard.test.js` with inline helpers (`assert`, `assertEqual`, `assertDeepEqual`) matching the pattern from `test/game.test.js`; add a `makeStore()` helper that returns `{ easy: [], medium: [], hard: [], infinite: [] }`; end the file with `console.log('All leaderboard tests passed')`
+- [X] T082 [P] [US9] Write test in `test/leaderboard.test.js`: `qualifies(makeStore(), 'easy', 999)` returns `true` when the easy array has 0 entries (fewer than 5)
+- [X] T083 [P] [US9] Write test in `test/leaderboard.test.js`: `qualifies` returns `false` when easy already has 5 entries and the new value (99999 ms) is worse than the 5th-place value (ascending sort for timed — higher ms is worse)
+- [X] T084 [P] [US9] Write test in `test/leaderboard.test.js`: `qualifies` returns `true` for `'infinite'` when the new level value beats (is greater than) the current 5th-place value (descending sort — higher level is better)
+- [X] T085 [P] [US9] Write test in `test/leaderboard.test.js`: `addEntry` on `'easy'` inserts the entry, sorts the category ascending by `value`, and the array length never exceeds 5 even after 6 insertions
+- [X] T086 [P] [US9] Write test in `test/leaderboard.test.js`: `addEntry` on `'infinite'` sorts the category descending by `value` and caps at 5 entries
+- [X] T087 [P] [US9] Write test in `test/leaderboard.test.js`: `loadLeaderboard()` returns `makeStore()` (all-empty arrays) when `localStorage` contains corrupt JSON (simulate by setting the key to `"not-json"` before calling — use a `globalThis.localStorage` mock object in Node: `{ getItem: () => 'not-json', setItem: () => {} }`)
+- [X] T088 [P] [US9] Write test in `test/leaderboard.test.js`: a `saveLeaderboard(store)` → `loadLeaderboard()` round-trip returns an object deeply equal to the original `store` (use the same `globalThis.localStorage` mock with a `Map`-backed implementation to capture the write)
+
+### Implementation for User Story 9
+
+- [X] T089 [US9] Create `src/leaderboard.js` exporting: `const LEADERBOARD_KEY = 'snailTrailLeaderboard'`; `const LEADERBOARD_MAX_ENTRIES = 5`; `function makeStore()`; `function qualifies(store, category, value)` — returns `true` if `store[category].length < LEADERBOARD_MAX_ENTRIES` OR (category is `'infinite'` ? `value > store[category][LEADERBOARD_MAX_ENTRIES - 1].value` : `value < store[category][LEADERBOARD_MAX_ENTRIES - 1].value`); `function addEntry(store, category, entry)` — pushes entry, sorts (ascending by `value` for timed, descending for infinite), slices to `LEADERBOARD_MAX_ENTRIES`, returns new store (immutable pattern); `function loadLeaderboard()` — `try { return JSON.parse(localStorage.getItem(LEADERBOARD_KEY)) ?? makeStore() } catch { return makeStore() }`; `function saveLeaderboard(store)` — `try { localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(store)) } catch { /* silent */ }`; mirror identical function bodies in the inline `<script>` in `index.html` (no import — preserves `file://` compat)
+- [X] T090 [US9] Add a `<button id="btn-leaderboard">Leaderboard</button>` to `#screen-start` in `index.html` (below the Play button); create `<div id="screen-leaderboard" class="hidden">` containing `<h2>Leaderboard</h2>`, four `<section>` elements each with a `<h3>` category heading ("Easy", "Medium", "Hard", "Infinite") and an `<ol>` (`id="lb-easy"`, `id="lb-medium"`, `id="lb-hard"`, `id="lb-infinite"`), and a `<button id="btn-lb-back">Back</button>`; add CSS so `#screen-leaderboard` renders as a full-screen view matching the start screen styling
+- [X] T091 [US9] Implement leaderboard view wiring in the inline script in `index.html`: define `showLeaderboard(store)` — iterate each category, clear the matching `<ol>`, append formatted `<li>` elements (`"AAA  12.34s  2026-07-09"` for timed; `"AAA  Lv 3  2026-07-09"` for infinite, where level displayed is `value + 1`), hide `#screen-start`, show `#screen-leaderboard`; attach `#btn-leaderboard` click → `showLeaderboard(loadLeaderboard())`; attach `#btn-lb-back` click → hide `#screen-leaderboard`, show `#screen-start`
+
+**Checkpoint**: `node test/leaderboard.test.js` prints all tests passed. In browser: set a record → reload → click Leaderboard → entry visible. `localStorage` unavailable (private mode) → leaderboard shows empty, game fully playable.
+
+---
+
+## Phase 13: User Story 10 — Arcade Name Entry (Priority: P5)
+
+**Goal**: When a new record qualifies, a name-entry overlay appears with 3 arcade-style letter boxes. Only A–Z input is accepted. Save is disabled until exactly 3 letters are entered. On save the entry is written to the leaderboard.
+
+**Independent Test**: Achieve a qualifying time on Medium → name entry overlay appears, score displayed, 3 boxes empty. Type "ABC" → Save button enables. Press Enter → "ABC" in Medium leaderboard. Press non-letter keys → silently ignored.
+
+### Implementation for User Story 10
+
+- [X] T092 [US10] Add `<div id="name-entry-overlay" class="hidden" aria-label="Name entry for new record" role="dialog">` to `index.html` containing: `<h2>NEW RECORD!</h2>`, `<p id="ne-score"></p>`, `<div id="letter-display"><span class="letter-box" aria-label="Letter 1"></span><span class="letter-box" aria-label="Letter 2"></span><span class="letter-box" aria-label="Letter 3"></span></div>`, and `<button id="btn-save-name" disabled>Save</button>`; add CSS for `#name-entry-overlay` as a full-viewport centered overlay with `z-index` above win/lose overlays; style `.letter-box` as `display: inline-block; width: 2.5rem; height: 2.5rem; border: 2px solid var(--color-player); font-family: monospace; font-size: 1.5rem; text-align: center; line-height: 2.5rem; margin: 0 4px`
+- [X] T093 [US10] Implement `startNameEntry(scoreLabel, onSave)` and `stopNameEntry()` in the inline script in `index.html`: `startNameEntry` — set `#ne-score` text to `scoreLabel`, reset `let letters = []`, update `#letter-display` spans from `letters` (empty boxes show `'_'`), attach `nameKeyHandler` on `document` (`keydown`): A–Z/a–z → push `key.toUpperCase()` if `letters.length < 3`, Backspace → pop last, Enter → call `onSave(letters.join(''))` only if `letters.length === 3`; all handled keys call `e.preventDefault()`; after each key update spans and toggle `#btn-save-name.disabled = letters.length !== 3`; attach `#btn-save-name` click → same as Enter; remove `hidden` from `#name-entry-overlay` and move focus to it; `stopNameEntry` — remove `nameKeyHandler`, add `hidden` to `#name-entry-overlay`
+- [X] T094 [US10] Wire qualification and name-entry into game-end flow in the inline script in `index.html`: after `state = checkEndConditions(state)`, if `state.phase === PHASE.WIN` and `state.mode !== 'infinite'`: load store, check `qualifies(store, state.mode, state.finalElapsedMs)`, if true call `startNameEntry('Time: ' + (state.finalElapsedMs / 1000).toFixed(2) + 's', name => { const entry = { name, value: state.finalElapsedMs, date: new Date().toISOString() }; saveLeaderboard(addEntry(loadLeaderboard(), state.mode, entry)); stopNameEntry(); showScreen('win'); setOverlayDifficulty(state.mode); })`, else `showScreen('win')`; if `state.phase === PHASE.LOSE` and `state.mode === 'infinite'`: check `qualifies(store, 'infinite', state.infiniteLevel)`, if true call `startNameEntry('Level ' + (state.infiniteLevel + 1), name => { const entry = { name, value: state.infiniteLevel, date: new Date().toISOString() }; saveLeaderboard(addEntry(loadLeaderboard(), 'infinite', entry)); stopNameEntry(); showScreen('lose'); })`, else `showScreen('lose')`
+
+**Checkpoint**: Achieve a qualifying time → name entry overlay appears. Type "AB" → Save disabled. Type "C" → Save enabled. Press Enter → leaderboard updated, win overlay shown. Type numbers/symbols → no effect.
+
+---
+
+## Phase 14: User Story 11 — GitHub Pages Hosting (Priority: P6)
+
+**Goal**: Pushing to `main` automatically deploys the static game to GitHub Pages with no build step.
+
+**Independent Test**: Inspect `.github/workflows/deploy.yml` — trigger is `push: branches: [main]`; steps are `checkout`, `configure-pages`, `upload-pages-artifact path: '.'`, `deploy-pages`; no `npm install`, `npm run build`, or any build command present.
+
+### Implementation for User Story 11
+
+- [X] T095 [US11] Create `.github/workflows/deploy.yml` at the repository root with the exact content: `name: Deploy to GitHub Pages`; trigger `on: push: branches: [main]`; `permissions: contents: read, pages: write, id-token: write`; `concurrency: group: pages, cancel-in-progress: true`; one job `deploy` running on `ubuntu-latest` with environment `{ name: github-pages, url: '${{ steps.deployment.outputs.page_url }}' }` and four steps: (1) `uses: actions/checkout@v4`, (2) `uses: actions/configure-pages@v5`, (3) `uses: actions/upload-pages-artifact@v3` with `with: path: '.'`, (4) `id: deployment` → `uses: actions/deploy-pages@v4`; no build commands, no `npm install`, no `node` invocation
+
+**Checkpoint**: `.github/workflows/deploy.yml` exists. On inspection: trigger is `push: [main]`, no build step, path is `.`, `deploy-pages` action present with correct permissions.
+
+---
+
+## Phase 15: Integration, Sync & Final Test Pass
+
+**Purpose**: Mirror inline logic to `src/` for testability, wire accessibility improvements for new overlays, extend `prefers-reduced-motion` coverage, and confirm the entire v2 test suite passes.
+
+- [X] T096 [P] Verify `src/leaderboard.js` (created in T089) is importable by `test/leaderboard.test.js`: update `test/leaderboard.test.js` to `import { makeStore, qualifies, addEntry, loadLeaderboard, saveLeaderboard } from '../src/leaderboard.js'`; confirm all 7 tests still pass with `node --experimental-vm-modules test/leaderboard.test.js` (or adjust import to CJS `require` if Node version does not support ESM flags); the function bodies in `src/leaderboard.js` and `index.html` inline script must remain identical
+- [X] T097 [P] Extend `test/game.test.js` to cover the new timer fields: add test that `createGameState` returns `startTime` as a number > 0 and `finalElapsedMs === null`; add test that after `checkEndConditions` returns a win state, `state.finalElapsedMs` is a positive number; add test that after `checkEndConditions` returns a lose state, `state.finalElapsedMs` is a positive number; run `node test/game.test.js` to confirm all pass
+- [X] T098 Extend the `@media (prefers-reduced-motion: reduce)` CSS block in `index.html` `<style>` to add `#hud, #name-entry-overlay { transition: none !important; animation: none !important; }`; extend the JS reduced-motion check in the inline script to skip `setInterval` HUD updates when `window.matchMedia('(prefers-reduced-motion: reduce)').matches` is true — instead compute a single static display at game start and update only on state transitions (win/lose)
+- [X] T099 [P] Add focus management to the name-entry overlay in `index.html` inline script: in `startNameEntry`, after showing the overlay call `document.getElementById('btn-save-name').focus()` (or the first letter-box if it is focusable); in `stopNameEntry`, return focus to the element that triggered name entry (store a `let nameEntryTrigger` reference before calling `startNameEntry` and call `nameEntryTrigger.focus()` in `stopNameEntry`); ensure `#btn-save-name` has a visible `:focus-visible` CSS outline via `:focus-visible { outline: 2px solid var(--color-player); outline-offset: 2px }`
+- [X] T100 Run the complete v2 test suite (`node test/game.test.js && node test/mapgen.test.js && node test/pathfinding.test.js && node test/leaderboard.test.js`) and verify zero failures; manually smoke-test the full v2 feature set per the quickstart: (a) timer ticks during play and freezes on win/lose, (b) win overlay shows elapsed time, (c) Infinite Mode escalates on win and records level on loss, (d) overlay difficulty selector changes mode between games, (e) name entry blocks save until 3 letters, names stored uppercase, (f) leaderboard persists after page reload, (g) Leaderboard button on start screen opens view and Back returns to start, (h) deploy.yml passes a lint/syntax check (`cat .github/workflows/deploy.yml`), (i) all four state transitions remain accessible by keyboard only
+
+**Checkpoint**: All four test files pass with zero failures. Full v2 game playable: timer, HUD, Infinite Mode, overlay difficulty selector, name entry, leaderboard, and deploy workflow all functioning.
+
+---
+
 ## Dependency Graph
 
 ```
@@ -195,12 +332,22 @@ Phase 1 (Setup)
         │     └── Phase 7 (US5: T051–T056)   ← extends US1 overlays + US4 restart
         │
         └── Phase 8 (Polish: T057–T061)  ← can begin after US1 complete; finalise last
+
+Phase 8 complete (T001–T061)
+  ├── Phase 9  (US6 Timer: T062–T070)        ← extends game state + index.html inline script
+  ├── Phase 10 (US8 Infinite: T071–T077)     ← extends DIFFICULTY + game state + inline script
+  ├── Phase 11 (US7 Overlay Selector: T078–T080) ← extends win/lose HTML; requires Phase 7
+  ├── Phase 12 (US9 Leaderboard: T081–T091)  ← new src/leaderboard.js + new test file + HTML
+  ├── Phase 13 (US10 Name Entry: T092–T094)  ← requires Phase 12 (leaderboard helpers exist)
+  ├── Phase 14 (US11 GitHub Pages: T095)     ← independent; file-only task
+  └── Phase 15 (Integration: T096–T100)      ← requires all phases above complete
 ```
 
-**Stories that can be implemented independently after US1**:
-- US3 (Procedural Map Generation) tests can be written in parallel with US2 implementation
-- US4 (Difficulty Selection) HTML work (T047) can be done in parallel with any Phase 4 task
-- US5 (Game States) overlay HTML (T051, T052) can be authored any time after Phase 1
+**Phases that can be implemented in parallel after T061**:
+- Phase 9 (Timer), Phase 10 (Infinite), Phase 11 (Overlay Selector), Phase 14 (Deploy) are all independent of each other
+- Phase 12 (Leaderboard tests T081–T088) can be written in parallel with Phases 9–11
+- Phase 13 (Name Entry) requires Phase 12 leaderboard helpers to exist first
+- Phase 15 must be the final phase
 
 ## Parallel Execution Examples
 
@@ -210,6 +357,12 @@ Phase 1 (Setup)
 - Batch B (after US1 wired): T028, T029, T030, T031, T032 (pathfinding test writing) + T042, T044, T045, T046 (mapgen test writing) + T047 (difficulty HTML)
 - Batch C: T059, T060 (module audits — different files)
 
+**After Phase 8 complete (v2 work), these batches can run in parallel**:
+
+- Batch D: T062–T070 (Timer) + T071–T077 (Infinite) + T078–T080 (Overlay Selector) + T081–T088 (Leaderboard tests) + T095 (deploy.yml)
+- Batch E (after T089 src/leaderboard.js exists): T092–T094 (Name Entry) + T096 (import wiring)
+- Batch F: T097–T099 (test extensions + a11y + reduced-motion — different concerns)
+
 ## Implementation Strategy
 
 **MVP (deliver and validate first)**: Complete Phases 1–3 (T001–T027). This gives a fully playable single-difficulty game with player movement, collision, and a win condition — independently testable and demoable.
@@ -218,4 +371,8 @@ Phase 1 (Setup)
 
 **Increment 3**: Add Phase 6 (difficulty selection) + Phase 7 (game states). Delivers the full spec with difficulty scaling, win/lose overlays, and restart.
 
-**Final**: Phase 8 (polish). Constitution compliance, accessibility, and full test suite passage.
+**Increment 4 (v2 core)**: Add Phases 9–11 in parallel (Timer, Infinite Mode, Overlay Selector). Delivers the escalation loop and HUD.
+
+**Increment 5 (v2 persistence)**: Add Phase 12 (Leaderboard) then Phase 13 (Name Entry). Delivers persistent records and the arcade input experience.
+
+**Final**: Phase 14 (GitHub Pages) + Phase 15 (integration + full test pass). Constitution compliance, accessibility, and complete test suite passage.

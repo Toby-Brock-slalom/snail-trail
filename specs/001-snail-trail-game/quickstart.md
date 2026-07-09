@@ -195,6 +195,143 @@ The following scenarios map directly to the User Stories in [spec.md](spec.md) a
 | `generateMap(15, 15)` | < 100 ms | `test/mapgen.test.js` |
 | `generateMap(20, 20)` | < 100 ms | `test/mapgen.test.js` |
 | `generateMap(25, 25)` | < 100 ms | `test/mapgen.test.js` |
+| `generateMap(70, 70)` (Infinite ~Level 10) | < 100 ms | `test/mapgen.test.js` |
+| `generateMap(120, 120)` (Infinite ~Level 20) | < 100 ms | `test/mapgen.test.js` |
 | `findPath` on 25×25 grid (worst case) | < 100 ms | `test/pathfinding.test.js` |
+| `findPath` on 120×120 grid (Infinite worst case) | < 100 ms | `test/pathfinding.test.js` |
 
 Run `node test/mapgen.test.js` and `node test/pathfinding.test.js` to verify these thresholds pass on your machine.
+
+---
+
+## v2 Validation Scenarios
+
+### Scenario 10 — Level Timer Display (US-6, FR-021–FR-023)
+
+**Prerequisites**: Open `index.html` in a browser.
+
+**Steps**:
+1. Start a game (any difficulty).
+2. Observe the HUD bar above the canvas.
+3. Wait approximately 10 seconds.
+4. Win or lose the game.
+5. Inspect the win/lose overlay.
+
+**Expected outcome**:
+- The HUD timer (left side) shows a live count in `S.ms` format (e.g. `"10.34s"`) updating approximately every 100 ms during play.
+- On win, the final elapsed time is displayed on the win overlay.
+- The timer stops updating after win/lose (HUD value freezes).
+- On starting a new game, the timer resets to `"0.00s"`.
+
+**Automated**: `test/game.test.js` — "timer freezes on win/lose", "timer resets on new game", SC-009 mock-clock assertion.
+
+---
+
+### Scenario 11 — Infinite Mode Level Progression (US-8, FR-026–FR-030)
+
+**Prerequisites**: Open `index.html` in a browser.
+
+**Steps**:
+1. Select Infinite Mode on the start screen.
+2. Start the game; verify HUD shows "Level 1" and the grid is approximately 20×20.
+3. Navigate to the treasure chest to win Level 1.
+4. Observe the next level beginning automatically.
+5. Verify HUD shows "Level 2" and the grid is visibly 5 cells wider and taller (25×25).
+6. Count the snails — should be 3 (one more than Level 1).
+7. Deliberately lose on Level 2 (let a snail catch you).
+8. Verify the result overlay shows "Highest Level: 2" (or equivalent).
+
+**Expected outcome**:
+- Level 1: 20×20 grid, 2 snails, HUD shows "Level 1".
+- Level 2: 25×25 grid, 3 snails, HUD shows "Level 2".
+- On loss: overlay shows highest level reached in that run.
+- On starting a new Infinite run: begins fresh at Level 1.
+
+**Automated**: `test/game.test.js` — "infinite level increments on win", "grid size scales by formula", "snail count scales by formula".
+
+---
+
+### Scenario 12 — Leaderboard Persistence (US-9, FR-031–FR-035)
+
+**Prerequisites**: Open `index.html` in a browser. Ensure localStorage is accessible.
+
+**Steps**:
+1. Play an Easy game and win (set a time).
+2. When name entry appears, enter "ABC" and save.
+3. Verify "ABC" appears in the on-screen win overlay or subsequent leaderboard view.
+4. Close the browser tab completely.
+5. Reopen `index.html`.
+6. Click the Leaderboard button on the start screen.
+7. Verify "ABC" still appears in the Easy category with the correct value and date.
+
+**Expected outcome**:
+- Leaderboard opens from start screen without starting a game.
+- Easy category shows "ABC" with the recorded time and date.
+- Closing and reopening the browser preserves the entry.
+
+**Automated**: `test/leaderboard.test.js` — "round-trip localStorage write/read", "sort ascending for timed categories", "entry persists across reloads".
+
+---
+
+### Scenario 13 — Name Entry UX (US-10, FR-036–FR-039)
+
+**Prerequisites**: Achieve a new record on any standard difficulty or reach a new highest Infinite level.
+
+**Steps**:
+1. Trigger a new record (first game always qualifies for an empty leaderboard).
+2. Verify the name entry overlay appears with "NEW RECORD!" heading and three empty character boxes.
+3. Press the `1` key — nothing should appear in the boxes (digit ignored).
+4. Press `a` — "A" appears in box 1 (converted to uppercase).
+5. Press `B` — "B" appears in box 2.
+6. Verify the Save button is disabled (only 2 of 3 letters entered).
+7. Press Enter — nothing happens (disabled).
+8. Press `Z` — "Z" appears in box 3.
+9. Verify the Save button is now enabled.
+10. Press Enter — record saved; win/lose overlay shown; leaderboard updated.
+
+**Expected outcome**:
+- Non-alpha keys silently ignored.
+- Input displayed uppercase.
+- Save disabled until exactly 3 letters; enabled at exactly 3.
+- After save, win/lose overlay is shown immediately.
+- Leaderboard contains "ABZ" with the correct value.
+
+**Automated**: `test/leaderboard.test.js` — "name validation accepts only A-Z", "name stored in uppercase", "save blocked with < 3 letters".
+
+---
+
+### Scenario 14 — In-Overlay Difficulty Change (US-7, FR-024–FR-025)
+
+**Prerequisites**: Complete a game on Easy.
+
+**Steps**:
+1. On the win or lose overlay, locate the difficulty radio group (Easy / Medium / Hard / Infinite).
+2. Verify Easy is pre-selected (matching the game just played).
+3. Select Hard using the keyboard (Tab to the radio group, arrow keys to Hard).
+4. Click or press Enter on "New Game".
+5. Verify the new game starts with Hard settings (25×25 grid, 3 snails).
+
+**Expected outcome**:
+- Win/lose overlay contains all four difficulty options.
+- Default selection matches the mode of the game that just ended.
+- Selecting a new mode and clicking New Game applies that mode immediately.
+- No page reload required.
+
+---
+
+### Scenario 15 — GitHub Actions Workflow Inspection (US-11, FR-040)
+
+**Prerequisites**: Repository cloned or accessed via GitHub.
+
+**Steps**:
+1. Open `.github/workflows/deploy.yml` in a text editor or on GitHub.
+2. Verify trigger: `on: push: branches: [main]`.
+3. Verify actions: `actions/configure-pages`, `actions/upload-pages-artifact` with `path: '.'`, `actions/deploy-pages`.
+4. Verify permissions: `contents: read`, `pages: write`, `id-token: write`.
+5. Verify no `npm install`, `npm run build`, or any shell build commands are present.
+6. Push a commit to `main` and verify the Actions tab shows a successful deployment.
+
+**Expected outcome**:
+- Workflow file contains no build steps.
+- Entire repository root is uploaded as the Pages artifact.
+- Deployment succeeds and the game is reachable at the GitHub Pages URL.

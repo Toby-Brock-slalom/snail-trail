@@ -35,10 +35,16 @@ export const PHASE = Object.freeze({
 });
 
 export const DIFFICULTY = Object.freeze({
-  EASY:   Object.freeze({ name: 'Easy',   cols: 15, rows: 15, snailCount: 1 }),
-  MEDIUM: Object.freeze({ name: 'Medium', cols: 20, rows: 20, snailCount: 2 }),
-  HARD:   Object.freeze({ name: 'Hard',   cols: 25, rows: 25, snailCount: 3 }),
+  EASY:     Object.freeze({ name: 'Easy',   cols: 15, rows: 15, snailCount: 1, mode: 'easy' }),
+  MEDIUM:   Object.freeze({ name: 'Medium', cols: 20, rows: 20, snailCount: 2, mode: 'medium' }),
+  HARD:     Object.freeze({ name: 'Hard',   cols: 25, rows: 25, snailCount: 3, mode: 'hard' }),
+  INFINITE: Object.freeze({ mode: 'infinite' }),
 });
+
+export const INFINITE_BASE_SIZE  = 20;
+export const INFINITE_SIZE_STEP  = 5;
+export const INFINITE_BASE_SNAILS = 2;
+export const HUD_INTERVAL_MS     = 100;
 
 // ---------------------------------------------------------------------------
 // Direction deltas
@@ -62,7 +68,23 @@ const DIRECTION_DELTA = Object.freeze({
  * @returns {GameState}
  */
 export function createGameState(difficulty) {
-  const mapData = generateMap(difficulty.cols, difficulty.rows, difficulty.snailCount);
+  let cols, rows, snailCount, mode, infiniteLevel;
+
+  if (difficulty.mode === 'infinite') {
+    infiniteLevel = difficulty.infiniteLevel ?? 0;
+    cols  = INFINITE_BASE_SIZE + infiniteLevel * INFINITE_SIZE_STEP;
+    rows  = cols;
+    snailCount = INFINITE_BASE_SNAILS + infiniteLevel;
+    mode  = 'infinite';
+  } else {
+    cols       = difficulty.cols;
+    rows       = difficulty.rows;
+    snailCount = difficulty.snailCount;
+    mode       = difficulty.mode || (difficulty.name || 'easy').toLowerCase();
+    infiniteLevel = 0;
+  }
+
+  const mapData = generateMap(cols, rows, snailCount);
   const { grid, startCell, treasureCell, snailStartCells } = mapData;
 
   const player = {
@@ -80,10 +102,14 @@ export function createGameState(difficulty) {
   return {
     phase: PHASE.PLAYING,
     difficulty,
+    mode,
+    infiniteLevel,
     grid,
     player,
     snails,
     treasureCell: { col: treasureCell.col, row: treasureCell.row },
+    startTime:     performance.now(),
+    finalElapsedMs: null,
   };
 }
 
@@ -158,12 +184,14 @@ export function resolveSnailTurns(state) {
 export function checkEndConditions(state) {
   if (state.phase !== PHASE.PLAYING) return state;
 
+  const now = performance.now();
+
   // Win: player reached the treasure
   if (
     state.player.col === state.treasureCell.col &&
     state.player.row === state.treasureCell.row
   ) {
-    return { ...state, phase: PHASE.WIN };
+    return { ...state, phase: PHASE.WIN, finalElapsedMs: now - state.startTime };
   }
 
   // Lose: any snail occupies the player's cell
@@ -171,7 +199,7 @@ export function checkEndConditions(state) {
     (snail) => snail.col === state.player.col && snail.row === state.player.row
   );
   if (caught) {
-    return { ...state, phase: PHASE.LOSE };
+    return { ...state, phase: PHASE.LOSE, finalElapsedMs: now - state.startTime };
   }
 
   return state;

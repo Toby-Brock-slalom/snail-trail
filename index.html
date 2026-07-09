@@ -5,20 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Snail Trail</title>
   <style>
-    /* Design tokens */
+    /* ── Design tokens ─────────────────────────────────────────────────────── */
     :root {
-      --color-wall: #2a2a2a;
-      --color-open: #d4d4d4;
-      --color-treasure: #f0b429;
-      --color-player: #3b82f6;
-      --color-snail: #f97316;
+      --color-wall:        #2a2a2a;
+      --color-open:        #d4d4d4;
+      --color-treasure:    #f0b429;
+      --color-player:      #3b82f6;
+      --color-snail:       #f97316;
       --color-snail-shell: #7c2d12;
-      --color-overlay-bg: rgba(0, 0, 0, 0.72);
-      --color-surface: #1e1e2e;
-      --color-text: #f5f5f5;
-      --color-accent: #f0b429;
+      --color-overlay-bg:  rgba(0, 0, 0, 0.72);
+      --color-surface:     #1e1e2e;
+      --color-text:        #f5f5f5;
+      --color-accent:      #f0b429;
+      --color-hud-bg:      #111;
+      --color-hud-text:    #eee;
       --radius: 8px;
-      --gap: 1rem;
+      --gap:    1rem;
     }
 
     *, *::before, *::after {
@@ -29,7 +31,7 @@
 
     body {
       background: var(--color-surface);
-      color: var(--color-text);
+      color:      var(--color-text);
       font-family: system-ui, sans-serif;
       min-height: 100dvh;
       display: flex;
@@ -47,22 +49,46 @@
       text-align: center;
     }
 
-    /* Canvas */
+    /* ── Canvas ─────────────────────────────────────────────────────────────── */
     #game-canvas {
       display: block;
       border: 3px solid #3f3f5c;
-      border-radius: var(--radius);
+      border-radius: 0 0 var(--radius) var(--radius);
       image-rendering: pixelated;
     }
 
-    /* Overlay & screen positioning */
+    /* ── Game area container ────────────────────────────────────────────────── */
+    #game-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Inner canvas wrapper (canvas + absolute overlays) ─────────────────── */
     .game-wrapper {
       position: relative;
       display: inline-block;
       line-height: 0;
     }
 
-    /* Screen / overlay shared styles */
+    /* ── HUD bar ────────────────────────────────────────────────────────────── */
+    #hud {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px 10px;
+      font-family: monospace;
+      font-size: 0.95rem;
+      background: var(--color-hud-bg);
+      color:      var(--color-hud-text);
+      min-height: 2rem;
+      border: 3px solid #3f3f5c;
+      border-bottom: none;
+      border-radius: var(--radius) var(--radius) 0 0;
+    }
+
+    /* ── Screen / overlay shared ────────────────────────────────────────────── */
     .screen,
     .overlay {
       position: absolute;
@@ -77,7 +103,7 @@
       text-align: center;
     }
 
-    /* Start screen sits on top of an empty canvas */
+    /* ── Start screen ───────────────────────────────────────────────────────── */
     #screen-start {
       background: var(--color-surface);
       color: var(--color-text);
@@ -100,26 +126,20 @@
       margin-bottom: 1.25rem;
     }
 
-    /* Overlays */
+    /* ── Overlays ───────────────────────────────────────────────────────────── */
     .overlay {
       background: var(--color-overlay-bg);
       backdrop-filter: blur(4px);
       -webkit-backdrop-filter: blur(4px);
     }
 
-    .overlay h2 {
-      font-size: clamp(1.4rem, 3vw, 2rem);
-    }
+    .overlay h2 { font-size: clamp(1.4rem, 3vw, 2rem); }
+    .overlay p  { font-size: 1rem; color: #ccc; }
 
-    .overlay p {
-      font-size: 1rem;
-      color: #ccc;
-    }
-
-    #overlay-win h2 { color: #4ade80; }
+    #overlay-win  h2 { color: #4ade80; }
     #overlay-lose h2 { color: #f87171; }
 
-    /* Fieldset for difficulty */
+    /* ── Difficulty fieldset (start screen) ─────────────────────────────────── */
     fieldset.difficulty-group {
       border: 1px solid #3f3f5c;
       border-radius: var(--radius);
@@ -154,7 +174,39 @@
       font-size: 0.9rem;
     }
 
-    /* Buttons */
+    /* ── Overlay difficulty selector ────────────────────────────────────────── */
+    .overlay-difficulty-selector {
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: var(--radius);
+      padding: 0.5rem 0.75rem;
+      margin-top: 0.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 0.75rem;
+      align-items: center;
+    }
+
+    .overlay-difficulty-selector legend {
+      font-size: 0.72rem;
+      color: #aaa;
+      padding: 0 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .overlay-diff-option {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+
+    .overlay-diff-option input[type="radio"] {
+      accent-color: var(--color-accent);
+    }
+
+    /* ── Buttons ────────────────────────────────────────────────────────────── */
     .btn {
       background: var(--color-accent);
       color: #1a1a1a;
@@ -171,37 +223,150 @@
     .btn:hover,
     .btn:focus-visible {
       filter: brightness(1.15);
-      outline: 3px solid #fff6;
+      outline: 2px solid var(--color-player);
       outline-offset: 2px;
     }
 
-    .btn:active {
-      transform: scale(0.97);
+    .btn:active { transform: scale(0.97); }
+
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+      filter: none;
     }
 
-    /* Hidden utility */
-    .hidden {
-      display: none !important;
+    .btn-secondary {
+      background: transparent;
+      color: var(--color-accent);
+      border: 2px solid var(--color-accent);
+      margin-top: 0.25rem;
     }
 
-    /* Visually hidden but accessible */
+    .btn-secondary:hover,
+    .btn-secondary:focus-visible {
+      background: var(--color-accent);
+      color: #1a1a1a;
+    }
+
+    /* ── Hidden / sr-only utilities ─────────────────────────────────────────── */
+    .hidden { display: none !important; }
+
     .sr-only {
       position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
       overflow: hidden;
       clip: rect(0,0,0,0);
       white-space: nowrap;
       border: 0;
     }
 
-    /* Reduced motion */
+    /* ── Leaderboard screen ─────────────────────────────────────────────────── */
+    #screen-leaderboard {
+      background: var(--color-surface);
+      color: var(--color-text);
+      border: 3px solid #3f3f5c;
+      border-radius: var(--radius);
+      padding: 2rem;
+      min-width: 360px;
+      max-width: 600px;
+      max-height: 82vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    #screen-leaderboard h2 {
+      color: var(--color-accent);
+      text-align: center;
+      font-size: 1.5rem;
+    }
+
+    .lb-sections {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+
+    @media (max-width: 500px) {
+      .lb-sections { grid-template-columns: 1fr; }
+      #screen-leaderboard { min-width: 0; width: 95vw; }
+    }
+
+    .lb-section h3 {
+      color: var(--color-accent);
+      font-size: 0.95rem;
+      margin-bottom: 0.4rem;
+      border-bottom: 1px solid #3f3f5c;
+      padding-bottom: 0.2rem;
+    }
+
+    .lb-entry {
+      display: flex;
+      gap: 0.5rem;
+      padding: 0.15rem 0;
+      font-family: monospace;
+      font-size: 0.82rem;
+    }
+
+    .lb-rank  { width: 1.4rem; color: #888; flex-shrink: 0; }
+    .lb-name  { width: 3rem;   font-weight: bold; color: var(--color-accent); flex-shrink: 0; }
+    .lb-score { flex: 1; }
+    .lb-date  { color: #666; font-size: 0.74rem; }
+    .lb-empty { color: #555; font-style: italic; font-size: 0.82rem; }
+
+    /* ── Name-entry overlay ─────────────────────────────────────────────────── */
+    #name-entry-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.88);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.25rem;
+      z-index: 200;
+      color: var(--color-text);
+    }
+
+    #name-entry-overlay h2 {
+      color: var(--color-accent);
+      font-size: 2rem;
+      letter-spacing: 0.12em;
+    }
+
+    #ne-score { font-size: 1.1rem; color: #ccc; }
+
+    #letter-display { display: flex; align-items: center; gap: 0; }
+
+    .letter-box {
+      display: inline-block;
+      width: 2.5rem;
+      height: 3rem;
+      border: 2px solid var(--color-player);
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 1.8rem;
+      text-align: center;
+      line-height: 3rem;
+      background: #111;
+      margin: 0 4px;
+      color: var(--color-text);
+      user-select: none;
+    }
+
+    /* ── Reduced motion ─────────────────────────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *,
       *::before,
       *::after {
+        transition: none !important;
+        animation: none !important;
+      }
+      #hud,
+      #name-entry-overlay {
         transition: none !important;
         animation: none !important;
       }
@@ -211,7 +376,7 @@
 <body>
   <h1 class="game-title">🐌 Snail Trail</h1>
 
-  <!-- Start Screen (visible before game begins) -->
+  <!-- ── Start Screen ──────────────────────────────────────────────────────── -->
   <div id="screen-start">
     <h2>Choose Difficulty</h2>
     <p>Navigate the maze — reach the treasure before the snails catch you!</p>
@@ -223,166 +388,275 @@
         <input type="radio" name="difficulty" id="diff-easy" value="easy" checked />
         <label for="diff-easy">Easy — 15×15, 1 Snail</label>
       </div>
-
       <div class="difficulty-option">
         <input type="radio" name="difficulty" id="diff-medium" value="medium" />
         <label for="diff-medium">Medium — 20×20, 2 Snails</label>
       </div>
-
       <div class="difficulty-option">
         <input type="radio" name="difficulty" id="diff-hard" value="hard" />
         <label for="diff-hard">Hard — 25×25, 3 Snails</label>
       </div>
+      <div class="difficulty-option">
+        <input type="radio" name="difficulty" id="diff-infinite" value="infinite" />
+        <label for="diff-infinite">Infinite — Escalating</label>
+      </div>
     </fieldset>
 
     <button id="btn-start" class="btn">Play</button>
+    <button id="btn-leaderboard" class="btn btn-secondary">🏆 Leaderboard</button>
     <p style="font-size:0.75rem;color:#666;margin-top:0.5rem;">Arrow keys or WASD to move</p>
   </div>
 
-  <!-- Game canvas wrapper (hidden until play begins) -->
-  <div class="game-wrapper hidden" id="game-area">
-    <canvas
-      id="game-canvas"
-      aria-label="Snail Trail game canvas"
-      role="img"
-    ></canvas>
-
-    <!-- Win Overlay -->
-    <div id="overlay-win" class="overlay hidden">
-      <h2>You Found the Treasure! 🏆</h2>
-      <p>You navigated the maze and reached the treasure chest!</p>
-      <button id="btn-restart-win" class="btn">New Game</button>
+  <!-- ── Leaderboard Screen ────────────────────────────────────────────────── -->
+  <div id="screen-leaderboard" class="hidden">
+    <h2>🏆 Leaderboard</h2>
+    <div class="lb-sections">
+      <section class="lb-section">
+        <h3>Easy</h3>
+        <ol id="lb-easy"></ol>
+      </section>
+      <section class="lb-section">
+        <h3>Medium</h3>
+        <ol id="lb-medium"></ol>
+      </section>
+      <section class="lb-section">
+        <h3>Hard</h3>
+        <ol id="lb-hard"></ol>
+      </section>
+      <section class="lb-section">
+        <h3>Infinite</h3>
+        <ol id="lb-infinite"></ol>
+      </section>
     </div>
-
-    <!-- Lose Overlay -->
-    <div id="overlay-lose" class="overlay hidden">
-      <h2>Caught by a Snail! 🐌</h2>
-      <p>A snail caught up with you. Better luck next time!</p>
-      <button id="btn-restart-lose" class="btn">Try Again</button>
-    </div>
+    <button id="btn-lb-back" class="btn">Back</button>
   </div>
 
-  <!-- ARIA live region for screen reader announcements -->
+  <!-- ── Game Area ─────────────────────────────────────────────────────────── -->
+  <div id="game-area" class="hidden">
+    <div class="game-wrapper">
+
+      <!-- HUD bar: timer left, mode right -->
+      <div id="hud" class="hidden">
+        <span id="hud-timer">0.00s</span>
+        <span id="hud-mode">Easy</span>
+      </div>
+
+      <canvas
+        id="game-canvas"
+        aria-label="Snail Trail game canvas"
+        role="img"
+      ></canvas>
+
+      <!-- Win Overlay -->
+      <div id="overlay-win" class="overlay hidden">
+        <h2>You Found the Treasure! 🏆</h2>
+        <p>You navigated the maze and reached the treasure chest!</p>
+        <p id="win-time" class="hidden"></p>
+        <fieldset class="overlay-difficulty-selector">
+          <legend>Next game mode</legend>
+          <label class="overlay-diff-option"><input type="radio" name="win-difficulty" value="easy" checked /> Easy</label>
+          <label class="overlay-diff-option"><input type="radio" name="win-difficulty" value="medium" /> Medium</label>
+          <label class="overlay-diff-option"><input type="radio" name="win-difficulty" value="hard" /> Hard</label>
+          <label class="overlay-diff-option"><input type="radio" name="win-difficulty" value="infinite" /> Infinite</label>
+        </fieldset>
+        <button id="btn-restart-win" class="btn">New Game</button>
+      </div>
+
+      <!-- Lose Overlay -->
+      <div id="overlay-lose" class="overlay hidden">
+        <h2>Caught by a Snail! 🐌</h2>
+        <p>A snail caught up with you. Better luck next time!</p>
+        <p id="lose-infinite-level" class="hidden"></p>
+        <fieldset class="overlay-difficulty-selector">
+          <legend>Next game mode</legend>
+          <label class="overlay-diff-option"><input type="radio" name="lose-difficulty" value="easy" checked /> Easy</label>
+          <label class="overlay-diff-option"><input type="radio" name="lose-difficulty" value="medium" /> Medium</label>
+          <label class="overlay-diff-option"><input type="radio" name="lose-difficulty" value="hard" /> Hard</label>
+          <label class="overlay-diff-option"><input type="radio" name="lose-difficulty" value="infinite" /> Infinite</label>
+        </fieldset>
+        <button id="btn-restart-lose" class="btn">Try Again</button>
+      </div>
+
+    </div><!-- /.game-wrapper -->
+  </div><!-- /#game-area -->
+
+  <!-- ── Name-Entry Overlay ────────────────────────────────────────────────── -->
+  <div id="name-entry-overlay" class="hidden"
+       aria-label="Name entry for new record" role="dialog">
+    <h2>NEW RECORD!</h2>
+    <p id="ne-score"></p>
+    <div id="letter-display">
+      <span class="letter-box" aria-label="Letter 1">_</span>
+      <span class="letter-box" aria-label="Letter 2">_</span>
+      <span class="letter-box" aria-label="Letter 3">_</span>
+    </div>
+    <button id="btn-save-name" class="btn" disabled>Save</button>
+  </div>
+
+  <!-- ── ARIA live region ───────────────────────────────────────────────────── -->
   <div id="game-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
 
   <script>
-  // ── Constants ────────────────────────────────────────────────────────────
-  const CELL = Object.freeze({ WALL: 'wall', OPEN: 'open', START: 'start', TREASURE: 'treasure' });
-  const PHASE = Object.freeze({ START: 'start', PLAYING: 'playing', WIN: 'win', LOSE: 'lose' });
-  const DIRECTION_DELTA = Object.freeze({ up:{dcol:0,drow:-1}, down:{dcol:0,drow:1}, left:{dcol:-1,drow:0}, right:{dcol:1,drow:0} });
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Constants
+  // ═══════════════════════════════════════════════════════════════════════════
+  var CELL      = Object.freeze({ WALL:'wall', OPEN:'open', START:'start', TREASURE:'treasure' });
+  var PHASE     = Object.freeze({ START:'start', PLAYING:'playing', WIN:'win', LOSE:'lose' });
+  var DIR_DELTA = Object.freeze({
+    up:    {dcol: 0, drow:-1},
+    down:  {dcol: 0, drow: 1},
+    left:  {dcol:-1, drow: 0},
+    right: {dcol: 1, drow: 0},
+  });
 
-  // ── Map generation ────────────────────────────────────────────────────────
+  var INFINITE_BASE_SIZE   = 20;
+  var INFINITE_SIZE_STEP   = 5;
+  var INFINITE_BASE_SNAILS = 2;
+  var HUD_INTERVAL_MS      = 100;
+
+  var DIFFICULTY_CONFIGS = {
+    easy:     {name:'Easy',   cols:15, rows:15, snailCount:1, mode:'easy'},
+    medium:   {name:'Medium', cols:20, rows:20, snailCount:2, mode:'medium'},
+    hard:     {name:'Hard',   cols:25, rows:25, snailCount:3, mode:'hard'},
+    infinite: {mode:'infinite'},
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Map generation
+  // ═══════════════════════════════════════════════════════════════════════════
   function makeGrid(cols, rows, defaultType) {
-    const cells = [];
-    for (let row = 0; row < rows; row++) {
-      const rowArr = [];
-      for (let col = 0; col < cols; col++) rowArr.push({ col, row, type: defaultType });
-      cells.push(rowArr);
+    var cells = [];
+    for (var row = 0; row < rows; row++) {
+      var r = [];
+      for (var col = 0; col < cols; col++) r.push({col:col, row:row, type:defaultType});
+      cells.push(r);
     }
-    return { cols, rows, cells };
+    return {cols:cols, rows:rows, cells:cells};
   }
-  function shuffle(array) {
-    for (let i = array.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [array[i], array[j]] = [array[j], array[i]];
+
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
     }
-    return array;
+    return arr;
   }
+
   function getNeighboursTwoAway(grid, col, row) {
-    return [{col,row:row-2},{col,row:row+2},{col:col-2,row},{col:col+2,row}]
-      .filter(n => n.row>=0 && n.row<grid.rows && n.col>=0 && n.col<grid.cols && grid.cells[n.row][n.col].type===CELL.WALL);
+    return [{col:col, row:row-2},{col:col, row:row+2},{col:col-2, row:row},{col:col+2, row:row}]
+      .filter(function(n){ return n.row>=0&&n.row<grid.rows&&n.col>=0&&n.col<grid.cols&&grid.cells[n.row][n.col].type===CELL.WALL; });
   }
-  function carveWall(grid, fromCol, fromRow, toCol, toRow) {
-    grid.cells[(fromRow+toRow)/2][(fromCol+toCol)/2].type = CELL.OPEN;
-    grid.cells[toRow][toCol].type = CELL.OPEN;
+
+  function carveWall(grid, fc, fr, tc, tr) {
+    grid.cells[(fr+tr)/2][(fc+tc)/2].type = CELL.OPEN;
+    grid.cells[tr][tc].type = CELL.OPEN;
   }
-  function findOpenCellInQuadrant(grid, [colMin,colMax], [rowMin,rowMax]) {
-    for (let row=rowMin; row<rowMax; row++)
-      for (let col=colMin; col<colMax; col++)
-        if (grid.cells[row][col].type===CELL.OPEN || grid.cells[row][col].type===CELL.START) return grid.cells[row][col];
+
+  function findOpenCellInQuadrant(grid, cRange, rRange) {
+    for (var row=rRange[0]; row<rRange[1]; row++)
+      for (var col=cRange[0]; col<cRange[1]; col++) {
+        var t = grid.cells[row][col].type;
+        if (t===CELL.OPEN||t===CELL.START) return grid.cells[row][col];
+      }
     return null;
   }
-  function findLastOpenCellInQuadrant(grid, [colMin,colMax], [rowMin,rowMax]) {
-    let found = null;
-    for (let row=rowMin; row<rowMax; row++)
-      for (let col=colMin; col<colMax; col++)
+
+  function findLastOpenCellInQuadrant(grid, cRange, rRange) {
+    var found = null;
+    for (var row=rRange[0]; row<rRange[1]; row++)
+      for (var col=cRange[0]; col<cRange[1]; col++)
         if (grid.cells[row][col].type===CELL.OPEN) found = grid.cells[row][col];
     return found;
   }
+
   function removeRandomWalls(grid, count) {
-    const candidates = [];
-    for (let row=1; row<grid.rows-1; row++)
-      for (let col=1; col<grid.cols-1; col++) {
+    var cands = [];
+    for (var row=1; row<grid.rows-1; row++)
+      for (var col=1; col<grid.cols-1; col++) {
         if (grid.cells[row][col].type!==CELL.WALL) continue;
-        const open = [{row:row-1,col},{row:row+1,col},{row,col:col-1},{row,col:col+1}]
-          .filter(n=>n.row>=0&&n.row<grid.rows&&n.col>=0&&n.col<grid.cols&&grid.cells[n.row][n.col].type===CELL.OPEN);
-        if (open.length >= 2) candidates.push({col,row});
+        var openNbs = [{row:row-1,col:col},{row:row+1,col:col},{row:row,col:col-1},{row:row,col:col+1}]
+          .filter(function(n){ return n.row>=0&&n.row<grid.rows&&n.col>=0&&n.col<grid.cols&&grid.cells[n.row][n.col].type===CELL.OPEN; });
+        if (openNbs.length >= 2) cands.push({col:col, row:row});
       }
-    shuffle(candidates);
-    for (let i=0; i<Math.min(count,candidates.length); i++) grid.cells[candidates[i].row][candidates[i].col].type=CELL.OPEN;
+    shuffle(cands);
+    for (var i=0; i<Math.min(count,cands.length); i++) grid.cells[cands[i].row][cands[i].col].type=CELL.OPEN;
   }
+
   function generateMap(cols, rows, snailCount) {
-    const grid = makeGrid(cols, rows, CELL.WALL);
+    var grid = makeGrid(cols, rows, CELL.WALL);
     grid.cells[1][1].type = CELL.OPEN;
-    const stack = [{col:1,row:1}];
+    var stack = [{col:1,row:1}];
     while (stack.length) {
-      const cur = stack[stack.length-1];
-      const unvisited = getNeighboursTwoAway(grid, cur.col, cur.row);
+      var cur = stack[stack.length-1];
+      var unvisited = getNeighboursTwoAway(grid, cur.col, cur.row);
       if (!unvisited.length) { stack.pop(); continue; }
       shuffle(unvisited);
       carveWall(grid, cur.col, cur.row, unvisited[0].col, unvisited[0].row);
       stack.push(unvisited[0]);
     }
     removeRandomWalls(grid, Math.floor(cols*rows*0.04));
-    const startCell = findOpenCellInQuadrant(grid, [1,Math.ceil(cols/2)], [1,Math.ceil(rows/2)]);
+
+    var startCell = findOpenCellInQuadrant(grid, [1,Math.ceil(cols/2)], [1,Math.ceil(rows/2)]);
     if (startCell) startCell.type = CELL.START;
-    const treasureCell = findLastOpenCellInQuadrant(grid, [Math.floor(cols/2),cols-1], [Math.floor(rows/2),rows-1]);
+    var treasureCell = findLastOpenCellInQuadrant(grid, [Math.floor(cols/2),cols-1], [Math.floor(rows/2),rows-1]);
     if (treasureCell) treasureCell.type = CELL.TREASURE;
-    const openCells = [];
-    for (let row=0; row<rows; row++)
-      for (let col=0; col<cols; col++)
+
+    var openCells = [];
+    for (var row=0; row<rows; row++)
+      for (var col=0; col<cols; col++)
         if (grid.cells[row][col].type===CELL.OPEN) openCells.push(grid.cells[row][col]);
     shuffle(openCells);
-    return { grid, startCell, treasureCell, snailStartCells: openCells.slice(0, snailCount) };
+
+    return {grid:grid, startCell:startCell, treasureCell:treasureCell, snailStartCells:openCells.slice(0, snailCount)};
   }
 
-  // ── Pathfinding (A*) ──────────────────────────────────────────────────────
-  function heuristic(a, b) { return Math.abs(a.col-b.col)+Math.abs(a.row-b.row); }
-  function posKey(col, row) { return `${col},${row}`; }
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Pathfinding (A*)
+  // ═══════════════════════════════════════════════════════════════════════════
+  function posKey(col, row) { return col+','+row; }
+  function heuristic(a, b)  { return Math.abs(a.col-b.col)+Math.abs(a.row-b.row); }
+
   function getPassableNeighbours(grid, col, row) {
-    return [{col,row:row-1},{col,row:row+1},{col:col-1,row},{col:col+1,row}]
-      .filter(n=>n.row>=0&&n.row<grid.rows&&n.col>=0&&n.col<grid.cols&&grid.cells[n.row][n.col].type!==CELL.WALL);
+    return [{col:col,row:row-1},{col:col,row:row+1},{col:col-1,row:row},{col:col+1,row:row}]
+      .filter(function(n){ return n.row>=0&&n.row<grid.rows&&n.col>=0&&n.col<grid.cols&&grid.cells[n.row][n.col].type!==CELL.WALL; });
   }
+
   function reconstructPath(cameFrom, current) {
-    const path = [{col:current.col,row:current.row}];
-    let node = current;
-    while (cameFrom.has(posKey(node.col,node.row))) { node=cameFrom.get(posKey(node.col,node.row)); path.unshift({col:node.col,row:node.row}); }
+    var path=[{col:current.col,row:current.row}], node=current;
+    while (cameFrom.has(posKey(node.col,node.row))) {
+      node=cameFrom.get(posKey(node.col,node.row));
+      path.unshift({col:node.col,row:node.row});
+    }
     return path;
   }
+
   function findPath(grid, from, to) {
-    if (grid.cells[from.row]?.[from.col]?.type===CELL.WALL) return null;
-    if (grid.cells[to.row]?.[to.col]?.type===CELL.WALL) return null;
-    if (from.col===to.col && from.row===to.row) return [{col:from.col,row:from.row}];
-    const openSet=[], closedSet=new Set(), cameFrom=new Map(), gScore=new Map(), fScore=new Map();
-    const sk=posKey(from.col,from.row);
+    if (!grid.cells[from.row]||!grid.cells[from.row][from.col]||grid.cells[from.row][from.col].type===CELL.WALL) return null;
+    if (!grid.cells[to.row]  ||!grid.cells[to.row][to.col]  ||grid.cells[to.row][to.col].type===CELL.WALL)     return null;
+    if (from.col===to.col&&from.row===to.row) return [{col:from.col,row:from.row}];
+
+    var openSet=[],closedSet=new Set(),cameFrom=new Map(),gScore=new Map(),fScore=new Map();
+    var sk=posKey(from.col,from.row);
     gScore.set(sk,0); fScore.set(sk,heuristic(from,to));
     openSet.push({col:from.col,row:from.row,f:fScore.get(sk)});
+
     while (openSet.length) {
-      const cur=openSet.shift(), ck=posKey(cur.col,cur.row);
+      var cur=openSet.shift(), ck=posKey(cur.col,cur.row);
       if (cur.col===to.col&&cur.row===to.row) return reconstructPath(cameFrom,cur);
       if (closedSet.has(ck)) continue;
       closedSet.add(ck);
-      for (const nb of getPassableNeighbours(grid,cur.col,cur.row)) {
-        const nk=posKey(nb.col,nb.row);
+      var nbs=getPassableNeighbours(grid,cur.col,cur.row);
+      for (var ni=0;ni<nbs.length;ni++) {
+        var nb=nbs[ni], nk=posKey(nb.col,nb.row);
         if (closedSet.has(nk)) continue;
-        const tg=(gScore.get(ck)??Infinity)+1;
-        if (tg<(gScore.get(nk)??Infinity)) {
+        var tg=(gScore.get(ck)||0)+1;
+        if (tg<(gScore.has(nk)?gScore.get(nk):Infinity)) {
           cameFrom.set(nk,{col:cur.col,row:cur.row});
           gScore.set(nk,tg);
-          const f=tg+heuristic(nb,to); fScore.set(nk,f);
-          const entry={col:nb.col,row:nb.row,f};
-          let ins=false;
-          for (let i=0;i<openSet.length;i++) { if (f<openSet[i].f){openSet.splice(i,0,entry);ins=true;break;} }
+          var f=tg+heuristic(nb,to); fScore.set(nk,f);
+          var entry={col:nb.col,row:nb.row,f:f};
+          var ins=false;
+          for (var oi=0;oi<openSet.length;oi++){if(f<openSet[oi].f){openSet.splice(oi,0,entry);ins=true;break;}}
           if (!ins) openSet.push(entry);
         }
       }
@@ -390,123 +664,501 @@
     return null;
   }
 
-  // ── Renderer ──────────────────────────────────────────────────────────────
-  const CELL_SIZE = 32;
-  const COLOR = Object.freeze({
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Renderer
+  // ═══════════════════════════════════════════════════════════════════════════
+  var CELL_SIZE = 32;
+  var COLOR = Object.freeze({
     WALL:'#2a2a2a', OPEN:'#d4d4d4', START:'#c8c8c8',
     TREASURE_BG:'#f0b429', TREASURE_FG:'#b8860b',
     PLAYER:'#3b82f6', SNAIL:'#f97316', SNAIL_SHELL:'#7c2d12',
   });
+
   function drawCell(ctx, cell, cw, ch) {
-    const x=cell.col*cw, y=cell.row*ch;
-    if (cell.type==='wall') { ctx.fillStyle=COLOR.WALL; ctx.fillRect(x,y,cw,ch); return; }
+    var x=cell.col*cw, y=cell.row*ch;
+    if (cell.type===CELL.WALL) { ctx.fillStyle=COLOR.WALL; ctx.fillRect(x,y,cw,ch); return; }
     ctx.fillStyle=COLOR.OPEN; ctx.fillRect(x,y,cw,ch);
-    if (cell.type==='treasure') {
-      const m=cw*0.1, w=cw*0.8, h=ch*0.55, cx2=x+m, cy2=y+(ch-h)/2;
-      ctx.fillStyle=COLOR.TREASURE_BG; ctx.fillRect(cx2,cy2,w,h);
-      ctx.fillStyle=COLOR.TREASURE_FG; ctx.fillRect(cx2,cy2+h*0.4,w,2);
-      const ls=cw*0.14; ctx.fillRect(cx2+w/2-ls/2,cy2+h*0.35,ls,ls*0.9);
+    if (cell.type===CELL.TREASURE) {
+      var m=cw*0.1, w=cw*0.8, h=ch*0.55, bx=x+m, by=y+(ch-h)/2;
+      ctx.fillStyle=COLOR.TREASURE_BG; ctx.fillRect(bx,by,w,h);
+      ctx.fillStyle=COLOR.TREASURE_FG; ctx.fillRect(bx,by+h*0.4,w,2);
+      var ls=cw*0.14; ctx.fillRect(bx+w/2-ls/2,by+h*0.35,ls,ls*0.9);
     }
   }
+
   function drawPlayer(ctx, player, cw, ch) {
-    const cx=player.col*cw+cw/2, cy=player.row*ch+ch/2, r=cw*0.38;
+    var cx=player.col*cw+cw/2, cy=player.row*ch+ch/2, r=cw*0.38;
     ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fillStyle=COLOR.PLAYER; ctx.fill();
     ctx.beginPath(); ctx.arc(cx-r*0.3,cy-r*0.25,r*0.18,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
     ctx.beginPath(); ctx.arc(cx+r*0.3,cy-r*0.25,r*0.18,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
   }
+
   function drawSnail(ctx, snail, cw, ch) {
-    const cx=snail.col*cw+cw/2, cy=snail.row*ch+ch/2, br=cw*0.35, sr=cw*0.20;
+    var cx=snail.col*cw+cw/2, cy=snail.row*ch+ch/2, br=cw*0.35, sr=cw*0.20;
     ctx.beginPath(); ctx.arc(cx,cy,br,0,Math.PI*2); ctx.fillStyle=COLOR.SNAIL; ctx.fill();
     ctx.beginPath(); ctx.arc(cx+br*0.15,cy-br*0.1,sr,-Math.PI/2,Math.PI,false);
     ctx.strokeStyle=COLOR.SNAIL_SHELL; ctx.lineWidth=Math.max(1.5,cw*0.05); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx+br*0.15,cy-br*0.1,sr*0.3,0,Math.PI*2); ctx.fillStyle=COLOR.SNAIL_SHELL; ctx.fill();
   }
+
   function render(canvas, state) {
-    const {grid,player,snails}=state;
-    canvas.width=grid.cols*CELL_SIZE; canvas.height=grid.rows*CELL_SIZE;
-    const ctx=canvas.getContext('2d');
+    var grid=state.grid, player=state.player, snails=state.snails;
+    canvas.width  = grid.cols * CELL_SIZE;
+    canvas.height = grid.rows * CELL_SIZE;
+    var ctx = canvas.getContext('2d');
     ctx.clearRect(0,0,canvas.width,canvas.height);
-    for (let row=0;row<grid.rows;row++) for (let col=0;col<grid.cols;col++) drawCell(ctx,grid.cells[row][col],CELL_SIZE,CELL_SIZE);
-    for (const snail of snails) drawSnail(ctx,snail,CELL_SIZE,CELL_SIZE);
-    drawPlayer(ctx,player,CELL_SIZE,CELL_SIZE);
+    for (var row=0; row<grid.rows; row++)
+      for (var col=0; col<grid.cols; col++)
+        drawCell(ctx, grid.cells[row][col], CELL_SIZE, CELL_SIZE);
+    for (var si=0; si<snails.length; si++) drawSnail(ctx, snails[si], CELL_SIZE, CELL_SIZE);
+    drawPlayer(ctx, player, CELL_SIZE, CELL_SIZE);
   }
 
-  // ── UI ────────────────────────────────────────────────────────────────────
-  let bound = false;
-  function showScreen(screenId) {
-    const ss=document.getElementById('screen-start'), ow=document.getElementById('overlay-win'),
-          ol=document.getElementById('overlay-lose'), ga=document.getElementById('game-area'),
-          st=document.getElementById('game-status');
-    ss.classList.add('hidden'); ow.classList.add('hidden'); ol.classList.add('hidden');
-    if (screenId==='start') { ga.classList.add('hidden'); ss.classList.remove('hidden'); if(st)st.textContent='Choose difficulty and press Play.'; }
-    else if (screenId==='game') { ga.classList.remove('hidden'); if(st)st.textContent='Game started. Use arrow keys or WASD to move.'; }
-    else if (screenId==='win') { ga.classList.remove('hidden'); ow.classList.remove('hidden'); if(st)st.textContent='You won!'; }
-    else if (screenId==='lose') { ga.classList.remove('hidden'); ol.classList.remove('hidden'); if(st)st.textContent='A snail caught you!'; }
-  }
-  function getSelectedDifficulty() {
-    const checked=document.querySelector('input[name="difficulty"]:checked');
-    const configs={easy:{name:'Easy',cols:15,rows:15,snailCount:1},medium:{name:'Medium',cols:20,rows:20,snailCount:2},hard:{name:'Hard',cols:25,rows:25,snailCount:3}};
-    return configs[checked?checked.value:'easy']??configs.easy;
-  }
-  function bindControls(handlers) {
-    if (bound) return; bound=true;
-    document.getElementById('btn-start').addEventListener('click',()=>handlers.onStart());
-    document.getElementById('btn-restart-win').addEventListener('click',()=>handlers.onRestart());
-    document.getElementById('btn-restart-lose').addEventListener('click',()=>handlers.onRestart());
-    const KEY_MAP={ArrowUp:'up',w:'up',W:'up',ArrowDown:'down',s:'down',S:'down',ArrowLeft:'left',a:'left',A:'left',ArrowRight:'right',d:'right',D:'right'};
-    document.addEventListener('keydown',(e)=>{ const dir=KEY_MAP[e.key]; if(!dir)return; e.preventDefault(); handlers.onKeyDown(dir); });
-  }
-
-  // ── Game logic ────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Game logic
+  // ═══════════════════════════════════════════════════════════════════════════
   function createGameState(difficulty) {
-    const {grid,startCell,treasureCell,snailStartCells}=generateMap(difficulty.cols,difficulty.rows,difficulty.snailCount);
+    var cols, rows, snailCount, mode, infiniteLevel;
+    if (difficulty.mode === 'infinite') {
+      infiniteLevel = (difficulty.infiniteLevel !== undefined) ? difficulty.infiniteLevel : 0;
+      cols       = INFINITE_BASE_SIZE + infiniteLevel * INFINITE_SIZE_STEP;
+      rows       = cols;
+      snailCount = INFINITE_BASE_SNAILS + infiniteLevel;
+      mode       = 'infinite';
+    } else {
+      cols       = difficulty.cols;
+      rows       = difficulty.rows;
+      snailCount = difficulty.snailCount;
+      mode       = difficulty.mode || (difficulty.name||'easy').toLowerCase();
+      infiniteLevel = 0;
+    }
+    var mapData = generateMap(cols, rows, snailCount);
+    var grid=mapData.grid, startCell=mapData.startCell, treasureCell=mapData.treasureCell, snailStartCells=mapData.snailStartCells;
+    var snails = snailStartCells.map(function(c,i){ return {id:i, col:c.col, row:c.row}; });
     return {
-      phase:PHASE.PLAYING, difficulty, grid,
-      player:{col:startCell.col,row:startCell.row,stepCount:0},
-      snails:snailStartCells.map((c,i)=>({id:i,col:c.col,row:c.row})),
-      treasureCell:{col:treasureCell.col,row:treasureCell.row},
+      phase: PHASE.PLAYING, difficulty:difficulty, mode:mode, infiniteLevel:infiniteLevel,
+      grid:grid,
+      player: {col:startCell.col, row:startCell.row, stepCount:0},
+      snails: snails,
+      treasureCell: {col:treasureCell.col, row:treasureCell.row},
+      startTime:      performance.now(),
+      finalElapsedMs: null,
     };
   }
+
   function movePlayer(state, direction) {
-    const {dcol,drow}=DIRECTION_DELTA[direction];
-    const tc=state.player.col+dcol, tr=state.player.row+drow;
+    var d=DIR_DELTA[direction], tc=state.player.col+d.dcol, tr=state.player.row+d.drow;
     if (tr<0||tr>=state.grid.rows||tc<0||tc>=state.grid.cols) return state;
     if (state.grid.cells[tr][tc].type===CELL.WALL) return state;
-    return {...state,player:{col:tc,row:tr,stepCount:state.player.stepCount+1}};
+    return Object.assign({}, state, {player:{col:tc, row:tr, stepCount:state.player.stepCount+1}});
   }
+
   function resolveSnailTurns(state) {
-    return {...state,snails:state.snails.map(snail=>{
-      const path=findPath(state.grid,{col:snail.col,row:snail.row},{col:state.player.col,row:state.player.row});
-      return (path&&path.length>=2)?{...snail,col:path[1].col,row:path[1].row}:snail;
-    })};
+    var updatedSnails = state.snails.map(function(snail){
+      var path=findPath(state.grid,{col:snail.col,row:snail.row},{col:state.player.col,row:state.player.row});
+      return (path&&path.length>=2) ? Object.assign({},snail,{col:path[1].col,row:path[1].row}) : snail;
+    });
+    return Object.assign({}, state, {snails:updatedSnails});
   }
+
   function checkEndConditions(state) {
     if (state.phase!==PHASE.PLAYING) return state;
-    if (state.player.col===state.treasureCell.col&&state.player.row===state.treasureCell.row) return {...state,phase:PHASE.WIN};
-    if (state.snails.some(s=>s.col===state.player.col&&s.row===state.player.row)) return {...state,phase:PHASE.LOSE};
+    var now = performance.now();
+    if (state.player.col===state.treasureCell.col && state.player.row===state.treasureCell.row)
+      return Object.assign({}, state, {phase:PHASE.WIN,  finalElapsedMs:now-state.startTime});
+    for (var i=0;i<state.snails.length;i++)
+      if (state.snails[i].col===state.player.col && state.snails[i].row===state.player.row)
+        return Object.assign({}, state, {phase:PHASE.LOSE, finalElapsedMs:now-state.startTime});
     return state;
   }
 
-  // ── Wiring ────────────────────────────────────────────────────────────────
-  const canvas = document.getElementById('game-canvas');
-  let state = null, isProcessing = false;
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Leaderboard  (mirrors src/leaderboard.js — identical function bodies)
+  // ═══════════════════════════════════════════════════════════════════════════
+  var LEADERBOARD_KEY         = 'snailTrailLeaderboard';
+  var LEADERBOARD_MAX_ENTRIES = 5;
+
+  function makeLeaderboardStore() {
+    return {easy:[], medium:[], hard:[], infinite:[]};
+  }
+
+  function qualifies(store, category, value) {
+    var cat = store[category];
+    if (!cat || cat.length < LEADERBOARD_MAX_ENTRIES) return true;
+    var lastValue = cat[LEADERBOARD_MAX_ENTRIES - 1].value;
+    return category === 'infinite' ? value > lastValue : value < lastValue;
+  }
+
+  function addLeaderboardEntry(store, category, entry) {
+    var cat = (store[category]||[]).concat([entry]);
+    if (category === 'infinite') cat.sort(function(a,b){return b.value-a.value;});
+    else                         cat.sort(function(a,b){return a.value-b.value;});
+    var next = Object.assign({}, store);
+    next[category] = cat.slice(0, LEADERBOARD_MAX_ENTRIES);
+    return next;
+  }
+
+  function loadLeaderboard() {
+    try {
+      var raw = localStorage.getItem(LEADERBOARD_KEY);
+      if (!raw) return makeLeaderboardStore();
+      return JSON.parse(raw) || makeLeaderboardStore();
+    } catch(e) { return makeLeaderboardStore(); }
+  }
+
+  function saveLeaderboard(store) {
+    try { localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(store)); }
+    catch(e) { /* silent */ }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Time formatting
+  // ═══════════════════════════════════════════════════════════════════════════
+  function formatTime(ms) {
+    var s = (ms || 0) / 1000;
+    if (s >= 60) {
+      var m = Math.floor(s / 60);
+      var rem = (s - m * 60).toFixed(1);
+      while (rem.length < 4) rem = '0' + rem;
+      return m + ':' + rem + 's';
+    }
+    return s.toFixed(2) + 's';
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HUD helpers
+  // ═══════════════════════════════════════════════════════════════════════════
+  function showHud() { document.getElementById('hud').classList.remove('hidden'); }
+  function hideHud() { document.getElementById('hud').classList.add('hidden'); }
+
+  function updateHudTimer(ms) {
+    var el = document.getElementById('hud-timer');
+    if (el) el.textContent = formatTime(ms);
+  }
+
+  function updateHudMode(lbl) {
+    var el = document.getElementById('hud-mode');
+    if (el) el.textContent = lbl;
+  }
+
+  function prefersReducedMotion() {
+    return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // UI / screen management
+  // ═══════════════════════════════════════════════════════════════════════════
+  var bound = false;
+
+  function showScreen(screenId) {
+    var ss = document.getElementById('screen-start');
+    var ow = document.getElementById('overlay-win');
+    var ol = document.getElementById('overlay-lose');
+    var ga = document.getElementById('game-area');
+    var sl = document.getElementById('screen-leaderboard');
+    var st = document.getElementById('game-status');
+
+    ss.classList.add('hidden');
+    ow.classList.add('hidden');
+    ol.classList.add('hidden');
+    if (sl) sl.classList.add('hidden');
+
+    if (screenId === 'start') {
+      ga.classList.add('hidden');
+      ss.classList.remove('hidden');
+      if (st) st.textContent = 'Choose difficulty and press Play.';
+    } else if (screenId === 'game') {
+      ga.classList.remove('hidden');
+      if (st) st.textContent = 'Game started. Use arrow keys or WASD to move.';
+    } else if (screenId === 'win') {
+      ga.classList.remove('hidden');
+      ow.classList.remove('hidden');
+      if (st) st.textContent = 'You won!';
+    } else if (screenId === 'lose') {
+      ga.classList.remove('hidden');
+      ol.classList.remove('hidden');
+      if (st) st.textContent = 'A snail caught you!';
+    }
+  }
+
+  function getDifficultyConfig(val) {
+    return DIFFICULTY_CONFIGS[val] || DIFFICULTY_CONFIGS.easy;
+  }
+
+  function getSelectedDifficulty() {
+    var checked = document.querySelector('input[name="difficulty"]:checked');
+    return getDifficultyConfig(checked ? checked.value : 'easy');
+  }
+
+  function getOverlaySelectedDifficulty() {
+    var winChecked  = document.querySelector('input[name="win-difficulty"]:checked');
+    var loseChecked = document.querySelector('input[name="lose-difficulty"]:checked');
+    var el = winChecked || loseChecked;
+    return getDifficultyConfig(el ? el.value : 'easy');
+  }
+
+  function setOverlayDifficulty(mode) {
+    ['win-difficulty','lose-difficulty'].forEach(function(name) {
+      document.querySelectorAll('input[name="'+name+'"]').forEach(function(inp){
+        inp.checked = (inp.value === mode);
+      });
+    });
+  }
+
+  function showLeaderboard(store) {
+    var cats = ['easy','medium','hard','infinite'];
+    for (var ci=0; ci<cats.length; ci++) {
+      var cat = cats[ci];
+      var ol  = document.getElementById('lb-' + cat);
+      if (!ol) continue;
+      ol.innerHTML = '';
+      var entries = (store && store[cat]) || [];
+      if (entries.length === 0) {
+        var li = document.createElement('li');
+        li.className = 'lb-empty';
+        li.textContent = 'No entries yet';
+        ol.appendChild(li);
+      } else {
+        for (var ei=0; ei<entries.length; ei++) {
+          var entry = entries[ei];
+          var li2 = document.createElement('li');
+          li2.className = 'lb-entry';
+          var score = cat === 'infinite' ? 'Level ' + (entry.value + 1) : formatTime(entry.value);
+          var date  = (entry.date || '').slice(0, 10);
+          li2.innerHTML =
+            '<span class="lb-rank">'  + (ei+1)    + '.</span>' +
+            '<span class="lb-name">'  + (entry.name||'???') + '</span>' +
+            '<span class="lb-score">' + score      + '</span>' +
+            '<span class="lb-date">'  + date       + '</span>';
+          ol.appendChild(li2);
+        }
+      }
+    }
+    document.getElementById('screen-start').classList.add('hidden');
+    document.getElementById('screen-leaderboard').classList.remove('hidden');
+  }
+
+  function bindControls(handlers) {
+    if (bound) return;
+    bound = true;
+
+    document.getElementById('btn-start').addEventListener('click', function(){ handlers.onStart(); });
+    document.getElementById('btn-restart-win').addEventListener('click',  function(){ handlers.onRestart(); });
+    document.getElementById('btn-restart-lose').addEventListener('click', function(){ handlers.onRestart(); });
+
+    document.getElementById('btn-leaderboard').addEventListener('click', function(){
+      showLeaderboard(loadLeaderboard());
+    });
+
+    document.getElementById('btn-lb-back').addEventListener('click', function(){
+      document.getElementById('screen-leaderboard').classList.add('hidden');
+      document.getElementById('screen-start').classList.remove('hidden');
+    });
+
+    document.getElementById('btn-save-name').addEventListener('click', function(){
+      if (nameSaveCallback) nameSaveCallback();
+    });
+
+    var KEY_MAP = {
+      ArrowUp:'up',   w:'up',   W:'up',
+      ArrowDown:'down',  s:'down', S:'down',
+      ArrowLeft:'left',  a:'left', A:'left',
+      ArrowRight:'right', d:'right', D:'right',
+    };
+    document.addEventListener('keydown', function(e){
+      var dir = KEY_MAP[e.key];
+      if (!dir) return;
+      e.preventDefault();
+      handlers.onKeyDown(dir);
+    });
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Name-entry overlay
+  // ═══════════════════════════════════════════════════════════════════════════
+  var nameKeyHandler   = null;
+  var nameEntryTrigger = null;
+  var nameSaveCallback = null;
+
+  function startNameEntry(scoreLabel, onSave) {
+    nameEntryTrigger = document.activeElement;
+    var letters = [];
+
+    var neScore    = document.getElementById('ne-score');
+    var letterBoxes = document.querySelectorAll('.letter-box');
+    var saveBtn    = document.getElementById('btn-save-name');
+
+    if (neScore) neScore.textContent = scoreLabel;
+
+    function updateDisplay() {
+      for (var i=0;i<letterBoxes.length;i++) letterBoxes[i].textContent = letters[i] || '_';
+      if (saveBtn) saveBtn.disabled = letters.length !== 3;
+    }
+    updateDisplay();
+
+    nameSaveCallback = function() {
+      if (letters.length === 3) onSave(letters.join(''));
+    };
+
+    if (nameKeyHandler) document.removeEventListener('keydown', nameKeyHandler);
+    nameKeyHandler = function(e) {
+      if (e.key === 'Backspace') { e.preventDefault(); letters.pop(); updateDisplay(); return; }
+      if (e.key === 'Enter' && letters.length === 3) { e.preventDefault(); onSave(letters.join('')); return; }
+      if (e.key.length === 1 && /^[a-zA-Z]$/.test(e.key) && letters.length < 3) {
+        e.preventDefault(); letters.push(e.key.toUpperCase()); updateDisplay(); return;
+      }
+    };
+    document.addEventListener('keydown', nameKeyHandler);
+
+    document.getElementById('name-entry-overlay').classList.remove('hidden');
+    if (saveBtn) saveBtn.focus();
+  }
+
+  function stopNameEntry() {
+    if (nameKeyHandler) { document.removeEventListener('keydown', nameKeyHandler); nameKeyHandler = null; }
+    nameSaveCallback = null;
+    document.getElementById('name-entry-overlay').classList.add('hidden');
+    if (nameEntryTrigger && typeof nameEntryTrigger.focus === 'function') nameEntryTrigger.focus();
+    nameEntryTrigger = null;
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Wiring
+  // ═══════════════════════════════════════════════════════════════════════════
+  var canvas             = document.getElementById('game-canvas');
+  var state              = null;
+  var isProcessing       = false;
+  var hudInterval        = null;
+  var currentInfiniteLevel = 0;
+
+  function startHudInterval() {
+    clearInterval(hudInterval); hudInterval = null;
+    if (!prefersReducedMotion()) {
+      hudInterval = setInterval(function(){ updateHudTimer(performance.now() - state.startTime); }, HUD_INTERVAL_MS);
+    }
+    updateHudTimer(0);
+  }
+
+  function stopHudInterval(finalMs) {
+    clearInterval(hudInterval); hudInterval = null;
+    updateHudTimer(finalMs || 0);
+  }
+
   function handleStart() {
-    state=createGameState(getSelectedDifficulty()); isProcessing=false;
-    showScreen('game'); requestAnimationFrame(()=>render(canvas,state));
+    var diff = getSelectedDifficulty();
+    currentInfiniteLevel = 0;
+    var cfg = (diff.mode === 'infinite') ? {mode:'infinite', infiniteLevel:0} : diff;
+    state = createGameState(cfg);
+    canvas.width  = state.grid.cols * CELL_SIZE;
+    canvas.height = state.grid.rows * CELL_SIZE;
+    isProcessing = false;
+    showScreen('game');
+    showHud();
+    updateHudMode(diff.mode === 'infinite' ? 'Infinite — Level 1' : diff.name);
+    startHudInterval();
+    requestAnimationFrame(function(){ render(canvas, state); });
   }
-  function handleRestart() { isProcessing=false; handleStart(); }
+
+  function handleRestart() {
+    var diff = getOverlaySelectedDifficulty();
+    currentInfiniteLevel = 0;
+    var cfg = (diff.mode === 'infinite') ? {mode:'infinite', infiniteLevel:0} : diff;
+    state = createGameState(cfg);
+    canvas.width  = state.grid.cols * CELL_SIZE;
+    canvas.height = state.grid.rows * CELL_SIZE;
+    isProcessing = false;
+    var winTime = document.getElementById('win-time');
+    if (winTime) winTime.classList.add('hidden');
+    var loseInfLvl = document.getElementById('lose-infinite-level');
+    if (loseInfLvl) loseInfLvl.classList.add('hidden');
+    showScreen('game');
+    showHud();
+    updateHudMode(diff.mode === 'infinite' ? 'Infinite — Level 1' : diff.name);
+    startHudInterval();
+    requestAnimationFrame(function(){ render(canvas, state); });
+  }
+
+  function handleGameEnd() {
+    stopHudInterval(state.finalElapsedMs || 0);
+
+    if (state.phase === PHASE.WIN) {
+      if (state.mode === 'infinite') {
+        currentInfiniteLevel++;
+        state = createGameState({mode:'infinite', infiniteLevel:currentInfiniteLevel});
+        canvas.width  = state.grid.cols * CELL_SIZE;
+        canvas.height = state.grid.rows * CELL_SIZE;
+        showScreen('game');
+        isProcessing = false;
+        updateHudMode('Infinite — Level ' + (currentInfiniteLevel + 1));
+        startHudInterval();
+        requestAnimationFrame(function(){ render(canvas, state); });
+        return;
+      }
+
+      // Timed win
+      var winMs   = state.finalElapsedMs;
+      var winMode = state.mode;
+      var winEl   = document.getElementById('win-time');
+      if (winEl) { winEl.textContent = 'Completed in ' + formatTime(winMs); winEl.classList.remove('hidden'); }
+      var store = loadLeaderboard();
+      if (qualifies(store, winMode, winMs)) {
+        var capturedWinMs   = winMs;
+        var capturedWinMode = winMode;
+        startNameEntry('Time: ' + formatTime(winMs), function(name) {
+          saveLeaderboard(addLeaderboardEntry(loadLeaderboard(), capturedWinMode,
+            {name:name, value:capturedWinMs, date:new Date().toISOString().slice(0,10)}));
+          stopNameEntry();
+          setOverlayDifficulty(capturedWinMode);
+          showScreen('win');
+        });
+      } else {
+        setOverlayDifficulty(winMode);
+        showScreen('win');
+      }
+
+    } else if (state.phase === PHASE.LOSE) {
+      if (state.mode === 'infinite') {
+        var loseLevel = state.infiniteLevel;
+        var loseEl    = document.getElementById('lose-infinite-level');
+        if (loseEl) { loseEl.textContent = 'Reached Level ' + (loseLevel + 1); loseEl.classList.remove('hidden'); }
+        currentInfiniteLevel = 0;
+        var storeInf = loadLeaderboard();
+        if (qualifies(storeInf, 'infinite', loseLevel)) {
+          var capturedLoseLevel = loseLevel;
+          startNameEntry('Level ' + (loseLevel + 1), function(name) {
+            saveLeaderboard(addLeaderboardEntry(loadLeaderboard(), 'infinite',
+              {name:name, value:capturedLoseLevel, date:new Date().toISOString().slice(0,10)}));
+            stopNameEntry();
+            showScreen('lose');
+          });
+        } else {
+          showScreen('lose');
+        }
+      } else {
+        var loseInfEl = document.getElementById('lose-infinite-level');
+        if (loseInfEl) loseInfEl.classList.add('hidden');
+        setOverlayDifficulty(state.mode);
+        showScreen('lose');
+      }
+    }
+  }
+
   function handleKeyDown(direction) {
-    if (!state||state.phase!==PHASE.PLAYING||isProcessing) return;
-    isProcessing=true;
-    state=movePlayer(state,direction);
-    if (state.player.stepCount%2===0&&state.player.stepCount>0) state=resolveSnailTurns(state);
-    state=checkEndConditions(state);
-    if (state.phase===PHASE.WIN) showScreen('win');
-    else if (state.phase===PHASE.LOSE) showScreen('lose');
-    requestAnimationFrame(()=>{ render(canvas,state); isProcessing=false; });
+    if (!state || state.phase !== PHASE.PLAYING || isProcessing) return;
+    isProcessing = true;
+    state = movePlayer(state, direction);
+    if (state.player.stepCount % 2 === 0 && state.player.stepCount > 0) state = resolveSnailTurns(state);
+    state = checkEndConditions(state);
+    requestAnimationFrame(function() {
+      render(canvas, state);
+      if (state.phase !== PHASE.PLAYING) handleGameEnd();
+      isProcessing = false;
+    });
   }
+
+  // Boot
   showScreen('start');
-  bindControls({onStart:handleStart,onRestart:handleRestart,onKeyDown:handleKeyDown});
+  bindControls({onStart:handleStart, onRestart:handleRestart, onKeyDown:handleKeyDown});
   </script>
 </body>
 </html>

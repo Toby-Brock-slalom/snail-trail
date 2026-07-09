@@ -143,3 +143,76 @@ All technical decisions for this feature were provided in the user's brief. This
 **Rationale**: These values satisfy FR-017 (at least two difficulty levels with distinct snail counts / grid sizes). The cell counts (225, 400, 625) are well within the performance budget for both DFS generation and A* pathfinding. Hard (25×25, 3 snails) requires three A* calls per snail turn — 3 × < 100 ms = < 300 ms total, still imperceptible as a turn-based game processes this synchronously.
 
 **Extensibility**: Adding a fourth difficulty is a one-line constant addition; no other code changes required.
+
+---
+
+## Decision 8 — Timer: `performance.now()` + DOM HUD (v2)
+
+**Decision**: Store `startTime = performance.now()` in `GameState` at the moment the game transitions to `'playing'`. Elapsed time is computed on demand as `performance.now() - state.startTime`. During play, a `setInterval` running every `HUD_INTERVAL_MS = 100` milliseconds calls `updateHud()` to refresh the display. On win or lose, `clearInterval` is called and `finalElapsedMs` is frozen in state.
+
+**Display format**: `((elapsedMs / 1000).toFixed(2) + 's')` — e.g. `"12.34s"` — rendered in a DOM element inside `#game-hud` above the canvas, not drawn on the canvas itself.
+
+**Rationale**: `performance.now()` is monotonic and sub-millisecond; `Date.now()` can jump on clock adjustments. The 100 ms update interval is imperceptible to users and avoids unnecessary DOM thrashing. A DOM element for the timer is screen-reader friendly and easily styled to match the dark theme.
+
+**Alternatives considered**: Canvas-drawn timer (inaccessible, harder to style); `Date.now()` (susceptible to drift); `requestAnimationFrame` timer loop (higher CPU cost for a display that only needs 10 updates/s).
+
+---
+
+## Decision 9 — Infinite Mode: 0-Based Internal Level Counter (v2)
+
+**Decision**: `infiniteLevel` in `GameState` is a 0-based integer. Display uses `infiniteLevel + 1`. Grid and snail formulas:
+
+- `cols = rows = 20 + (infiniteLevel * 5)`
+- `snailCount = 2 + infiniteLevel`
+
+At `infiniteLevel = 0` (Level 1): 20×20, 2 snails — matches FR-027.
+After winning: `infiniteLevel++`. At `infiniteLevel = 1` (Level 2): 25×25, 3 snails — matches FR-028.
+
+**Leaderboard value for infinite**: The raw `infiniteLevel` value reached before loss (0-based). Displayed as `infiniteLevel + 1` everywhere in the UI.
+
+**Rationale**: 0-based counter makes the arithmetic formula simple and avoids off-by-one errors. The +1 display offset is applied exactly once at the UI layer.
+
+**Alternatives considered**: 1-based counter with `cols = 20 + ((infiniteLevel - 1) * 5)` — correct but easier to misread in tests.
+
+---
+
+## Decision 10 — Leaderboard: localStorage JSON (v2)
+
+**Decision**: Single localStorage key `snailTrailLeaderboard` containing JSON-encoded `LeaderboardStore`:
+```json
+{ "easy": [...], "medium": [...], "hard": [...], "infinite": [...] }
+```
+Each entry: `{ "name": "AAA", "value": 12340, "date": "2026-07-09T14:30:00.000Z" }`. Cap: 5 entries per category. Sort: ascending `value` for timed modes; descending `value` for infinite. Tie-breaking: earlier date wins. Qualification: `category.length < 5` OR new value beats `category[4].value`.
+
+All reads and writes wrapped in `try/catch`; on any failure return empty store and continue.
+
+**Rationale**: `localStorage` is synchronous, zero-setup, universally available in modern browsers, and persists across sessions. IndexedDB is async and overkill for ≤ 20 entries total.
+
+---
+
+## Decision 11 — Name Entry: DOM Character-Box Overlay (v2)
+
+**Decision**: `<div id="name-entry-overlay">` with three `<span class="letter-box">` elements styled as arcade character displays (monospace font, bordered, highlighted when active). Keyboard handler: A–Z (uppercase) fills the next empty box; Backspace clears the last filled box; Enter triggers save only when all 3 boxes are filled. Save `<button>` has `disabled` attribute managed programmatically.
+
+**Rationale**: DOM-based input is screen-reader accessible, keyboard-navigable, and far easier to style (border, highlight, font) than a canvas-drawn custom text field.
+
+---
+
+## Decision 12 — In-Overlay Difficulty: Radio Group (v2)
+
+**Decision**: Win and lose overlays each embed a `<div class="difficulty-selector">` with four `<input type="radio" name="overlay-difficulty">` elements (easy/medium/hard/infinite) and corresponding `<label>` elements. The radio default is the mode of the game that just ended. "New Game" reads the selected radio to determine mode for the next game.
+
+**Rationale**: Standard radio group is keyboard-navigable (arrow keys) with no JavaScript required for the selection mechanism. Minimal DOM, semantic HTML.
+
+---
+
+## Decision 13 — GitHub Actions: Three-Action Pages Deploy (v2)
+
+**Decision**: `.github/workflows/deploy.yml` uses:
+1. `actions/configure-pages`
+2. `actions/upload-pages-artifact` with `path: '.'`
+3. `actions/deploy-pages`
+
+Trigger: `push: branches: [main]`. Permissions: `contents: read`, `pages: write`, `id-token: write`. Concurrency: `group: pages`, `cancel-in-progress: true`. No build commands — the repository root is the artifact.
+
+**Rationale**: Standard GitHub-recommended pattern for static sites. Zero build step satisfies FR-040 AC-3. Concurrency group prevents redundant deployments on rapid successive pushes.

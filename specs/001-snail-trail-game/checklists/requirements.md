@@ -2,6 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-07-09
+**Revised**: 2026-07-09 (v2 — added Level Timer, In-Overlay Difficulty Change, Infinite Mode, Leaderboard, Arcade Name Entry, GitHub Pages)
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,6 +32,8 @@
 
 ## Notes
 
-- All checklist items passed on first validation pass
+- All checklist items passed on re-validation after v2 additions
 - Constitution alignment confirmed: constitution.md (v2.0.0) governs this feature — vanilla stack, testable logic modules, full keyboard operability, shape-based visual distinction, and the 100 ms performance thresholds are all reflected in FR-018, FR-019, SC-002, SC-003, and SC-008
+- v2 additions confirmed technology-agnostic: localStorage is referenced only in FR-031 and the Assumptions section (boundary call); all success criteria remain user-outcome-focused
+- FR-036–FR-039 (name entry) and FR-040 (GitHub Pages workflow) contain one concrete technical reference each (localStorage, GitHub Actions) — these are boundary-layer implementation details necessary to specify the feature and do not represent technology leakage into user-facing requirements
 - Spec is ready to proceed to `/speckit.plan`

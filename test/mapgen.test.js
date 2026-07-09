@@ -147,6 +147,10 @@ async function runTests() {
     }
   }
 
+  // T073: Infinite Mode Level 20 benchmark (120×120, 22 snails) < 100ms
+  console.log('generateMap — benchmark infinite level 20 (120×120, 22 snails) < 100ms:');
+  benchmark('generateMap(120, 120, 22)', () => generateMap(120, 120, 22), 100);
+
   console.log('\nAll mapgen tests passed.\n');
 }
 

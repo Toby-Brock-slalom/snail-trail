@@ -102,7 +102,7 @@ function buildTestState(CELL, PHASE) {
 async function runTests() {
   // Import game module (ES module in Node)
   // We use a shim so we can test the pure functions without browser globals
-  const { CELL, PHASE, movePlayer, checkEndConditions, resolveSnailTurns } =
+  const { CELL, PHASE, createGameState, movePlayer, checkEndConditions, resolveSnailTurns } =
     await import('../src/game.js').catch((err) => {
       // If import fails due to browser globals (canvas element missing),
       // patch minimal stubs and re-throw useful message
@@ -224,6 +224,58 @@ async function runTests() {
     const next = resolveSnailTurns(enclosed);
     assertEqual(next.snails[0].col, 1, 'enclosed snail col unchanged');
     assertEqual(next.snails[0].row, 1, 'enclosed snail row unchanged');
+  }
+
+  // T062 / T097 — createGameState sets timer fields
+  console.log('createGameState — timer fields initialised:');
+  {
+    const st = createGameState({ name: 'Easy', cols: 15, rows: 15, snailCount: 1, mode: 'easy' });
+    assert(typeof st.startTime === 'number' && st.startTime > 0,
+      'startTime is a positive number');
+    assertEqual(st.finalElapsedMs, null, 'finalElapsedMs starts as null');
+  }
+
+  // T063 / T097 — checkEndConditions WIN sets finalElapsedMs
+  console.log('checkEndConditions — WIN sets finalElapsedMs:');
+  {
+    const state = buildTestState(CELL, PHASE);
+    const stWithTimer = { ...state, startTime: performance.now() - 500, finalElapsedMs: null };
+    const winning = { ...stWithTimer, player: { col: 3, row: 3, stepCount: 10 } };
+    const next = checkEndConditions(winning);
+    assertEqual(next.phase, PHASE.WIN, 'phase is WIN');
+    assert(typeof next.finalElapsedMs === 'number' && next.finalElapsedMs > 0,
+      'finalElapsedMs is a positive number on WIN');
+  }
+
+  // T064 / T097 — checkEndConditions LOSE sets finalElapsedMs
+  console.log('checkEndConditions — LOSE sets finalElapsedMs:');
+  {
+    const state = buildTestState(CELL, PHASE);
+    const stWithTimer = { ...state, startTime: performance.now() - 300, finalElapsedMs: null };
+    const losing = { ...stWithTimer, snails: [{ id: 0, col: stWithTimer.player.col, row: stWithTimer.player.row }] };
+    const next = checkEndConditions(losing);
+    assertEqual(next.phase, PHASE.LOSE, 'phase is LOSE');
+    assert(typeof next.finalElapsedMs === 'number' && next.finalElapsedMs > 0,
+      'finalElapsedMs is a positive number on LOSE');
+  }
+
+  // T071 — createGameState infinite level 0
+  console.log('createGameState — infinite level 0 (20×20, 2 snails):');
+  {
+    const st = createGameState({ mode: 'infinite', infiniteLevel: 0 });
+    assertEqual(st.grid.cols, 20, 'grid.cols === 20');
+    assertEqual(st.grid.rows, 20, 'grid.rows === 20');
+    assertEqual(st.snails.length, 2, 'snails.length === 2');
+    assertEqual(st.infiniteLevel, 0, 'infiniteLevel === 0');
+  }
+
+  // T072 — createGameState infinite level 1
+  console.log('createGameState — infinite level 1 (25×25, 3 snails):');
+  {
+    const st = createGameState({ mode: 'infinite', infiniteLevel: 1 });
+    assertEqual(st.grid.cols, 25, 'grid.cols === 25 at level 1');
+    assertEqual(st.grid.rows, 25, 'grid.rows === 25 at level 1');
+    assertEqual(st.snails.length, 3, 'snails.length === 3 at level 1');
   }
 
   console.log('\nAll game tests passed.\n');

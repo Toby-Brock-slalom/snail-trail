@@ -191,13 +191,71 @@ The single authoritative record of all runtime game data. Treated as an immutabl
 
 | From | Event | To | Side Effects |
 |------|-------|----|--------------|
-| `start` | Start button clicked, difficulty selected | `playing` | `createGameState(difficulty)` called; new `GameState` returned; canvas rendered |
-| `playing` | Player moves onto treasure cell | `win` | Win overlay shown via `ui.js`; input handler disabled |
-| `playing` | Any snail occupies player's cell after turn resolves | `lose` | Lose overlay shown via `ui.js`; input handler disabled |
-| `win` | Restart button clicked | `playing` | `createGameState(difficulty)` called; new map generated; overlays hidden |
-| `lose` | Restart button clicked | `playing` | `createGameState(difficulty)` called; new map generated; overlays hidden |
+| `start` | Start button clicked, difficulty selected | `playing` | `createGameState(mode)` called; new `GameState` returned; canvas rendered; HUD shown; `setInterval` started |
+| `playing` | Player moves onto treasure cell (non-infinite) | `win` | `finalElapsedMs` frozen; interval cleared; HUD frozen; leaderboard qualification checked; overlay shown |
+| `playing` | Player wins level (infinite) | `playing` | `infiniteLevel++`; new `GameState` generated with escalated grid/snails; `startTime` reset; interval continues |
+| `playing` | Any snail occupies player's cell after turn resolves | `lose` | `finalElapsedMs` frozen; interval cleared; HUD frozen; leaderboard qualification checked; overlay shown |
+| `win` or `lose` | Qualifies for leaderboard | `name-entry` | Name entry overlay shown; movement input disabled |
+| `win` or `lose` | Does not qualify | (stays on overlay) | No additional state change |
+| `name-entry` | Save button clicked (3 letters entered) | `win` or `lose` | Record written to `localStorage`; name entry overlay hidden; win/lose overlay shown |
+| `win` | New Game button clicked | `playing` | New `GameState` created with selected difficulty radio; overlays hidden; HUD reset; interval restarted |
+| `lose` | New Game button clicked | `playing` | Same as win restart |
+| `start` | Leaderboard button clicked | `leaderboard` | Leaderboard overlay rendered; no game state change |
+| `leaderboard` | Back / Escape pressed | `start` | Leaderboard overlay hidden |
 
-**Note**: Restart from `win` or `lose` regenerates the map with the same difficulty that was active when the game ended. To change difficulty, the user returns to the `start` screen — which requires a page reload in v1 (the start screen is only shown on initial load). A future enhancement could expose a "Change Difficulty" option from the overlay.
+---
+
+## v2 Entity Additions
+
+### `GameMode` (string union)
+
+```
+'easy'     — 15×15 grid, 1 snail (DifficultyConfig.EASY)
+'medium'   — 20×20 grid, 2 snails (DifficultyConfig.MEDIUM)
+'hard'     — 25×25 grid, 3 snails (DifficultyConfig.HARD)
+'infinite' — escalating; dimensions computed from infiniteLevel
+```
+
+### `GamePhase` additions (v2)
+
+```
+'name-entry'  — name entry overlay visible; movement input disabled; no HUD update needed
+'leaderboard' — leaderboard overlay visible from start screen; no active game
+```
+
+### `GameState` v2 fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `mode` | `GameMode` | Active game mode |
+| `startTime` | `number \| null` | `performance.now()` at play start; `null` before/after play |
+| `finalElapsedMs` | `number \| null` | Frozen elapsed ms on win/lose; `null` during play |
+| `infiniteLevel` | `number` | 0-based internal level (display as `infiniteLevel + 1`); 0 for all non-infinite modes |
+
+**Infinite level formulas** (at any `infiniteLevel`):
+- `cols = rows = 20 + (infiniteLevel * 5)` — Level 1 display = 20×20; Level 2 display = 25×25
+- `snailCount = 2 + infiniteLevel` — Level 1 display = 2 snails; Level 2 display = 3 snails
+
+### `LeaderboardEntry`
+
+| Field | Type | Validation |
+|-------|------|------------|
+| `name` | `string` | `/^[A-Z]{3}$/` — exactly 3 uppercase alpha characters |
+| `value` | `number` | Elapsed ms (≥ 0) for timed modes; `infiniteLevel` reached (0-based, ≥ 0) for infinite |
+| `date` | `string` | ISO 8601 string; `new Date(date)` must not return `Invalid Date` |
+
+### `LeaderboardStore`
+
+| Field | Type | Sort | Description |
+|-------|------|------|-------------|
+| `easy` | `LeaderboardEntry[]` | Ascending `value` | ≤ 5 entries; lower ms = better |
+| `medium` | `LeaderboardEntry[]` | Ascending `value` | ≤ 5 entries; lower ms = better |
+| `hard` | `LeaderboardEntry[]` | Ascending `value` | ≤ 5 entries; lower ms = better |
+| `infinite` | `LeaderboardEntry[]` | Descending `value` | ≤ 5 entries; higher level = better |
+
+**Qualification rule**: A new entry qualifies if `category.length < 5` OR `newValue` beats `category[4].value` by the category's sort order.
+**Tie-breaking**: Earlier `date` ranks above a same-`value` later entry.
+**Storage key**: `snailTrailLeaderboard` in `localStorage`.
 
 ---
 
@@ -214,3 +272,10 @@ The single authoritative record of all runtime game data. Treated as an immutabl
 | Lose triggered when any snail shares the player's cell | FR-011 | `checkEndConditions` in `game.js` |
 | Map must contain exactly one start and one treasure | FR-002 | Enforced by `generateMap` in `mapgen.js` |
 | Grid must contain wall clusters, not just corridors | FR-004 | Wall-removal step post-DFS in `mapgen.js` produces cycles while retaining clusters |
+| Timer starts on play, stops on win/lose | FR-021 | `startTime` set in start transition; `finalElapsedMs` frozen and interval cleared on end |
+| Infinite Mode Level 1 = 20×20, 2 snails | FR-027 | `getInfiniteConfig(0)` returns `{ cols: 20, rows: 20, snailCount: 2 }` |
+| Infinite Mode escalation: +5 cols/rows, +1 snail per level | FR-028 | `getInfiniteConfig(infiniteLevel)` formula |
+| Leaderboard entries capped at 5 per category | FR-034 | `addLeaderboardEntry` in inline script / `leaderboard.js` |
+| Name entry accepts only A–Z; silently ignores other input | FR-037 | Keyboard handler in name entry overlay |
+| Save disabled until exactly 3 letters entered | FR-038 | Save button `disabled` attribute toggled by letter count |
+| localStorage failures do not crash the game | FR-031 | All reads/writes in `try/catch`; empty store returned on failure |
