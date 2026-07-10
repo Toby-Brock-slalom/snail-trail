@@ -103,6 +103,20 @@
       text-align: center;
     }
 
+    .overlay {
+      gap: 1.4rem;
+      padding: 2rem 2.5rem;
+    }
+
+    .overlay .btn {
+      min-width: 160px;
+    }
+
+    .overlay-difficulty-selector {
+      margin-top: 0.25rem;
+      margin-bottom: 0.25rem;
+    }
+
     /* ── Start screen ───────────────────────────────────────────────────────── */
     #screen-start {
       background: var(--color-surface);
@@ -612,13 +626,38 @@
     var treasureCell = findLastOpenCellInQuadrant(grid, [Math.floor(cols/2),cols-1], [Math.floor(rows/2),rows-1]);
     if (treasureCell) treasureCell.type = CELL.TREASURE;
 
-    var openCells = [];
-    for (var row=0; row<rows; row++)
-      for (var col=0; col<cols; col++)
-        if (grid.cells[row][col].type===CELL.OPEN) openCells.push(grid.cells[row][col]);
-    shuffle(openCells);
+    // BFS from start to measure distances — snails must spawn beyond minDist
+    var minDist = Math.max(8, Math.floor(Math.min(cols, rows) * 0.35));
+    var distMap = {};
+    var bfsQueue = [{col:startCell.col, row:startCell.row, d:0}];
+    distMap[startCell.col+','+startCell.row] = 0;
+    while (bfsQueue.length) {
+      var bfsNode = bfsQueue.shift();
+      var bfsNbs = [{col:bfsNode.col,row:bfsNode.row-1},{col:bfsNode.col,row:bfsNode.row+1},{col:bfsNode.col-1,row:bfsNode.row},{col:bfsNode.col+1,row:bfsNode.row}];
+      for (var bi=0; bi<bfsNbs.length; bi++) {
+        var nb = bfsNbs[bi];
+        var nk = nb.col+','+nb.row;
+        if (nb.row<0||nb.row>=rows||nb.col<0||nb.col>=cols) continue;
+        if (grid.cells[nb.row][nb.col].type===CELL.WALL) continue;
+        if (distMap[nk]!==undefined) continue;
+        distMap[nk] = bfsNode.d+1;
+        bfsQueue.push({col:nb.col,row:nb.row,d:bfsNode.d+1});
+      }
+    }
 
-    return {grid:grid, startCell:startCell, treasureCell:treasureCell, snailStartCells:openCells.slice(0, snailCount)};
+    // Prefer cells beyond minDist; fall back to any open cell if not enough
+    var farCells = [], anyCells = [];
+    for (var row=0; row<rows; row++)
+      for (var col=0; col<cols; col++) {
+        if (grid.cells[row][col].type!==CELL.OPEN) continue;
+        anyCells.push(grid.cells[row][col]);
+        if ((distMap[col+','+row]||0) >= minDist) farCells.push(grid.cells[row][col]);
+      }
+    shuffle(farCells);
+    shuffle(anyCells);
+    var snailPool = farCells.length >= snailCount ? farCells : anyCells;
+
+    return {grid:grid, startCell:startCell, treasureCell:treasureCell, snailStartCells:snailPool.slice(0, snailCount)};
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
