@@ -88,6 +88,22 @@
       border-radius: var(--radius) var(--radius) 0 0;
     }
 
+    #hud-powerup {
+      color: #a3e635;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      animation: pulse-powerup 0.6s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulse-powerup {
+      from { opacity: 1; }
+      to   { opacity: 0.55; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #hud-powerup { animation: none; }
+    }
+
     /* ── Screen / overlay shared ────────────────────────────────────────────── */
     .screen,
     .overlay {
@@ -462,6 +478,7 @@
       <!-- HUD bar: timer left, mode right -->
       <div id="hud" class="hidden">
         <span id="hud-timer">0.00s</span>
+        <span id="hud-powerup" class="hidden">⚡ 8</span>
         <span id="hud-mode">Easy</span>
       </div>
 
@@ -525,7 +542,7 @@
   // ═══════════════════════════════════════════════════════════════════════════
   // Constants
   // ═══════════════════════════════════════════════════════════════════════════
-  var CELL      = Object.freeze({ WALL:'wall', OPEN:'open', START:'start', TREASURE:'treasure' });
+  var CELL      = Object.freeze({ WALL:'wall', OPEN:'open', START:'start', TREASURE:'treasure', POWERUP:'powerup' });
   var PHASE     = Object.freeze({ START:'start', PLAYING:'playing', WIN:'win', LOSE:'lose' });
   var DIR_DELTA = Object.freeze({
     up:    {dcol: 0, drow:-1},
@@ -657,7 +674,18 @@
     shuffle(anyCells);
     var snailPool = farCells.length >= snailCount ? farCells : anyCells;
 
-    return {grid:grid, startCell:startCell, treasureCell:treasureCell, snailStartCells:snailPool.slice(0, snailCount)};
+    // Place power-up near centre (middle 30% of grid), not on start/treasure/snail cells
+    var cMin=Math.floor(cols*0.35), cMax=Math.ceil(cols*0.65);
+    var rMin=Math.floor(rows*0.35), rMax=Math.ceil(rows*0.65);
+    var centerCells = [];
+    for (var row=rMin; row<rMax; row++)
+      for (var col=cMin; col<cMax; col++)
+        if (grid.cells[row][col].type===CELL.OPEN) centerCells.push(grid.cells[row][col]);
+    shuffle(centerCells);
+    var powerupCell = centerCells[0] || null;
+    if (powerupCell) powerupCell.type = CELL.POWERUP;
+
+    return {grid:grid, startCell:startCell, treasureCell:treasureCell, snailStartCells:snailPool.slice(0, snailCount), powerupCell:powerupCell};
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -734,11 +762,25 @@
       ctx.fillStyle=COLOR.TREASURE_FG; ctx.fillRect(bx,by+h*0.4,w,2);
       var ls=cw*0.14; ctx.fillRect(bx+w/2-ls/2,by+h*0.35,ls,ls*0.9);
     }
+    if (cell.type===CELL.POWERUP) {
+      var pcx=x+cw/2, pcy=y+ch/2, pr=cw*0.38;
+      // Glowing green-yellow circle
+      ctx.beginPath(); ctx.arc(pcx,pcy,pr,0,Math.PI*2);
+      ctx.fillStyle='#a3e635'; ctx.fill();
+      ctx.strokeStyle='#65a30d'; ctx.lineWidth=Math.max(1.5,cw*0.06); ctx.stroke();
+      // Lightning bolt via text
+      ctx.fillStyle='#1a2e05';
+      ctx.font = 'bold '+(cw*0.55)+'px sans-serif';
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('⚡', pcx, pcy+cw*0.04);
+    }
   }
 
-  function drawPlayer(ctx, player, cw, ch) {
+  function drawPlayer(ctx, player, cw, ch, powerupActive) {
     var cx=player.col*cw+cw/2, cy=player.row*ch+ch/2, r=cw*0.38;
-    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.fillStyle=COLOR.PLAYER; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+    ctx.fillStyle = powerupActive ? '#a3e635' : COLOR.PLAYER; ctx.fill();
+    if (powerupActive) { ctx.strokeStyle='#65a30d'; ctx.lineWidth=Math.max(2,cw*0.08); ctx.stroke(); }
     ctx.beginPath(); ctx.arc(cx-r*0.3,cy-r*0.25,r*0.18,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
     ctx.beginPath(); ctx.arc(cx+r*0.3,cy-r*0.25,r*0.18,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
   }
@@ -761,7 +803,7 @@
       for (var col=0; col<grid.cols; col++)
         drawCell(ctx, grid.cells[row][col], CELL_SIZE, CELL_SIZE);
     for (var si=0; si<snails.length; si++) drawSnail(ctx, snails[si], CELL_SIZE, CELL_SIZE);
-    drawPlayer(ctx, player, CELL_SIZE, CELL_SIZE);
+    drawPlayer(ctx, player, CELL_SIZE, CELL_SIZE, state.powerupActive);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -783,7 +825,8 @@
       infiniteLevel = 0;
     }
     var mapData = generateMap(cols, rows, snailCount);
-    var grid=mapData.grid, startCell=mapData.startCell, treasureCell=mapData.treasureCell, snailStartCells=mapData.snailStartCells;
+    var grid=mapData.grid, startCell=mapData.startCell, treasureCell=mapData.treasureCell,
+        snailStartCells=mapData.snailStartCells, powerupCell=mapData.powerupCell;
     var snails = snailStartCells.map(function(c,i){ return {id:i, col:c.col, row:c.row}; });
     return {
       phase: PHASE.PLAYING, difficulty:difficulty, mode:mode, infiniteLevel:infiniteLevel,
@@ -791,6 +834,9 @@
       player: {col:startCell.col, row:startCell.row, stepCount:0},
       snails: snails,
       treasureCell: {col:treasureCell.col, row:treasureCell.row},
+      powerupCell: powerupCell ? {col:powerupCell.col, row:powerupCell.row} : null,
+      powerupActive: false,
+      powerupMovesRemaining: 0,
       startTime:      performance.now(),
       finalElapsedMs: null,
     };
@@ -805,6 +851,19 @@
 
   function resolveSnailTurns(state) {
     var updatedSnails = state.snails.map(function(snail){
+      if (state.powerupActive) {
+        // Flee: pick the passable neighbour farthest from the player
+        var nbs = getPassableNeighbours(state.grid, snail.col, snail.row);
+        if (!nbs.length) return snail;
+        var best = snail, bestDist = Math.abs(snail.col-state.player.col)+Math.abs(snail.row-state.player.row);
+        for (var i=0;i<nbs.length;i++) {
+          // Don't step onto the player's cell while fleeing
+          if (nbs[i].col===state.player.col && nbs[i].row===state.player.row) continue;
+          var d=Math.abs(nbs[i].col-state.player.col)+Math.abs(nbs[i].row-state.player.row);
+          if (d>bestDist) { bestDist=d; best=nbs[i]; }
+        }
+        return Object.assign({},snail,{col:best.col,row:best.row});
+      }
       var path=findPath(state.grid,{col:snail.col,row:snail.row},{col:state.player.col,row:state.player.row});
       return (path&&path.length>=2) ? Object.assign({},snail,{col:path[1].col,row:path[1].row}) : snail;
     });
@@ -1202,6 +1261,24 @@
     if (!state || state.phase !== PHASE.PLAYING || isProcessing) return;
     isProcessing = true;
     state = movePlayer(state, direction);
+    // Collect powerup if player stepped onto it
+    if (state.powerupCell &&
+        state.player.col === state.powerupCell.col &&
+        state.player.row === state.powerupCell.row) {
+      state.grid.cells[state.powerupCell.row][state.powerupCell.col].type = CELL.OPEN;
+      state = Object.assign({}, state, { powerupActive:true, powerupMovesRemaining:8, powerupCell:null });
+    }
+    // Decrement powerup counter each player step
+    if (state.powerupActive) {
+      var rem = state.powerupMovesRemaining - 1;
+      state = Object.assign({}, state, { powerupActive: rem > 0, powerupMovesRemaining: rem });
+    }
+    // Update powerup HUD
+    var puEl = document.getElementById('hud-powerup');
+    if (puEl) {
+      if (state.powerupActive) { puEl.textContent = '⚡ '+state.powerupMovesRemaining; puEl.classList.remove('hidden'); }
+      else puEl.classList.add('hidden');
+    }
     if (state.player.stepCount % 2 === 0 && state.player.stepCount > 0) state = resolveSnailTurns(state);
     state = checkEndConditions(state);
     requestAnimationFrame(function() {
